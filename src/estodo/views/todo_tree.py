@@ -51,6 +51,7 @@ class TodoTreeWidget(QWidget):
 
     todo_selected = pyqtSignal(object)  # Emits Todo or None
     todo_double_clicked = pyqtSignal(object)  # Emits Todo
+    start_pomodoro_for_todo = pyqtSignal(object)  # Emits Todo
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -164,6 +165,8 @@ class TodoTreeWidget(QWidget):
         add_action = menu.addAction("新建待办")
         add_child_action = menu.addAction("新建子待办")
         menu.addSeparator()
+        pomodoro_action = menu.addAction("🍅 开始番茄钟")
+        menu.addSeparator()
         edit_action = menu.addAction("编辑")
         toggle_action = menu.addAction("标记完成" if not item.todo.is_completed else "标记未完成")
         menu.addSeparator()
@@ -177,6 +180,8 @@ class TodoTreeWidget(QWidget):
         elif action == add_child_action:
             # TODO: Emit signal
             pass
+        elif action == pomodoro_action:
+            self.start_pomodoro_for_todo.emit(item.todo)
         elif action == edit_action:
             self.todo_double_clicked.emit(item.todo)
         elif action == toggle_action:

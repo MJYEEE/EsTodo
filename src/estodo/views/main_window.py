@@ -4,15 +4,19 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QSplitter, QFrame
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QDate
 from PyQt6.QtGui import QAction, QIcon
 from typing import Optional
+from datetime import datetime, timedelta
 
 from .theme import Theme, get_stylesheet
 from .todo_tree import TodoTreeWidget
 from .todo_editor import TodoEditor
+from .pomodoro_timer import PomodoroTimerWindow
+from .notifications import notify
 from ..database import Database
 from ..models.todo import TodoModel, Todo
+from ..models.pomodoro import PomodoroModel, Pomodoro
 
 
 class MainWindow(QMainWindow):
@@ -22,8 +26,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.db = db
         self.todo_model = TodoModel(db)
+        self.pomodoro_model = PomodoroModel(db)
         self.current_todo: Optional[Todo] = None
         self.current_theme = Theme.LIGHT
+        self.pomodoro_window: Optional[PomodoroTimerWindow] = None
 
         self._setup_ui()
         self._load_todos()
@@ -118,6 +124,7 @@ class MainWindow(QMainWindow):
         self.todo_tree.add_button.clicked.connect(self._on_new_todo)
         self.todo_tree.add_child_button.clicked.connect(self._on_new_child_todo)
         self.todo_tree.delete_button.clicked.connect(self._on_delete_todo)
+        self.todo_tree.start_pomodoro_for_todo.connect(self._start_pomodoro_for_todo)
         splitter.addWidget(self.todo_tree)
 
         self.todo_editor = TodoEditor()
@@ -176,6 +183,13 @@ class MainWindow(QMainWindow):
         new_todo.setShortcut("Ctrl+N")
         new_todo.triggered.connect(self._on_new_todo)
         file_menu.addAction(new_todo)
+
+        file_menu.addSeparator()
+
+        start_pomodoro = QAction("启动番茄钟(&P)", self)
+        start_pomodoro.setShortcut("Ctrl+P")
+        start_pomodoro.triggered.connect(self._toggle_pomodoro_window)
+        file_menu.addAction(start_pomodoro)
 
         file_menu.addSeparator()
 
@@ -304,3 +318,74 @@ class MainWindow(QMainWindow):
         self.current_todo = None
         self.todo_editor.clear()
         self.todo_editor.setVisible(False)
+
+    def _toggle_pomodoro_window(self):
+        """Toggle pomodoro timer window"""
+        if self.pomodoro_window is None:
+            self._create_pomodoro_window()
+
+        if self.pomodoro_window.isVisible():
+            self.pomodoro_window.hide()
+        else:
+            self.pomodoro_window.show()
+            self.pomodoro_window.raise_()
+            self.pomodoro_window.activateWindow()
+
+    def _create_pomodoro_window(self):
+        """Create the pomodoro timer window"""
+        self.pomodoro_window = PomodoroTimerWindow()
+        self.pomodoro_window.timer_started.connect(self._on_pomodoro_started)
+        self.pomodoro_window.timer_paused.connect(self._on_pomodoro_paused)
+        self.pomodoro_window.timer_resumed.connect(self._on_pomodoro_resumed)
+        self.pomodoro_window.timer_stopped.connect(self._on_pomodoro_stopped)
+        self.pomodoro_window.timer_completed.connect(self._on_pomodoro_completed)
+        self._update_pomodoro_count()
+
+    def _start_pomodoro_for_todo(self, todo: Todo):
+        """Start pomodoro timer linked to a todo"""
+        if self.pomodoro_window is None:
+            self._create_pomodoro_window()
+
+        self.pomodoro_window.link_to_todo(todo.id, todo.title)
+        self.pomodoro_window.show()
+        self.pomodoro_window.raise_()
+        self.pomodoro_window.activateWindow()
+
+    def _on_pomodoro_started(self, pomodoro: Pomodoro):
+        """Handle pomodoro started"""
+        if pomodoro.id is None:
+            self.pomodoro_model.create(pomodoro)
+
+    def _on_pomodoro_paused(self, pomodoro: Pomodoro):
+        """Handle pomodoro paused"""
+        pass
+
+    def _on_pomodoro_resumed(self, pomodoro: Pomodoro):
+        """Handle pomodoro resumed"""
+        pass
+
+    def _on_pomodoro_stopped(self, pomodoro: Pomodoro):
+        """Handle pomodoro stopped"""
+        if pomodoro.id:
+            self.pomodoro_model.update(pomodoro)
+
+    def _on_pomodoro_completed(self, pomodoro: Pomodoro):
+        """Handle pomodoro completed"""
+        if pomodoro.id:
+            self.pomodoro_model.update(pomodoro)
+
+        # Show notification
+        notify("番茄钟完成！", "休息一下吧，你做得很棒！")
+
+        # Update count
+        self._update_pomodoro_count()
+
+    def _update_pomodoro_count(self):
+        """Update today's pomodoro count"""
+        if self.pomodoro_window:
+            today = datetime.now().date()
+            start = datetime.combine(today, datetime.min.time())
+            end = start + timedelta(days=1)
+            pomodoros = self.pomodoro_model.get_by_date_range(start, end)
+            completed = [p for p in pomodoros if p.is_completed]
+            self.pomodoro_window.update_today_count(len(completed))

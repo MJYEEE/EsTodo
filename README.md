@@ -8,7 +8,11 @@
 - ✅ 子待办支持（无限层级）
 - ✅ Markdown 内容
 - ✅ 优先级标记
-- ⏳ 番茄钟（开发中）
+- ✅ 深色/浅色主题切换
+- ✅ 番茄钟（工作/短休息/长休息）
+- ✅ 番茄钟暂停/继续/停止
+- ✅ 系统通知（plyer）
+- ✅ 番茄钟与待办关联
 - ⏳ 番茄日历（开发中）
 - ⏳ 导入导出（开发中）
 - ⏳ 标签系统（开发中）
@@ -65,38 +69,48 @@ EsTodo/
 │           ├── main_window.py
 │           ├── todo_tree.py
 │           ├── todo_editor.py
+│           ├── pomodoro_timer.py
+│           ├── notifications.py
 │           ├── theme.py
 │           └── markdown.py
 ├── requirements.txt
-└── README.md
+├── README.md
+└── run.sh
 ```
 
 ## 开发计划
 
-### v0.1 (当前)
+### v0.1
 - 基础待办功能
 - 子待办
 - Markdown 内容
 
-### v0.2
-- 番茄钟基础计时
-- 系统通知
+### v0.2 (当前)
+- 番茄钟基础计时（工作/短休息/长休息）
+- 番茄钟暂停/继续/停止
+- 系统通知（plyer）
+- 番茄钟与待办关联
+- 深色/浅色主题切换
+- 优先级标记
 
 ### v0.3
-- 番茄钟与待办关联
 - 番茄日历热力图
 
 ### v0.4
-- 优先级
 - 标签系统
 
 ### v0.5
 - JSON 导入导出
-- 深色/浅色主题切换
 
 ### v0.6
 - PyInstaller 打包
 - GitHub Actions CI/CD
+
+## 快捷键
+
+- `Ctrl+N` - 新建待办
+- `Ctrl+P` - 打开/关闭番茄钟
+- `Ctrl+Q` - 退出
 
 ## License
 
