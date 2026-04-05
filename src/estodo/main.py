@@ -1,7 +1,16 @@
-"""EsTodo - Main entry point"""
+"""EsTodo - Main entry point - Windows 11 optimized (PyQt6 compatible)"""
 
 import sys
+import os
 from pathlib import Path
+
+# ============================================
+# Environment variables must be set BEFORE Qt import
+# ============================================
+
+# WSL / Linux: force xcb instead of wayland
+if sys.platform.startswith("linux"):
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 # Add src to path if running directly
 src_path = Path(__file__).parent.parent
@@ -17,33 +26,49 @@ from estodo.views.main_window import MainWindow
 
 
 def main():
-    """Main application entry point"""
+    """Main application entry point - PyQt6 compatible"""
+
+    # Windows-specific optimizations
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EsTodo.App")
+        except (AttributeError, ImportError):
+            pass
+
+    # Create application
     app = QApplication(sys.argv)
     app.setApplicationName("EsTodo")
     app.setOrganizationName("EsTodo")
 
-    # Set default font - support Chinese characters
-    font = QFont()
-    font.setPointSize(10)
-    # Try common Chinese fonts in order of priority
-    chinese_fonts = [
-        "Microsoft YaHei",  # 微软雅黑
-        "SimHei",           # 黑体
-        "WenQuanYi Micro Hei",  # 文泉驿微米黑
-        "Noto Sans CJK SC", # Noto CJK 简体中文
-        "Source Han Sans SC", # 思源黑体
-        "Sans Serif",       # 通用无衬线
-    ]
-    for font_name in chinese_fonts:
-        font.setFamily(font_name)
-        if font.exactMatch():
-            break
-    app.setFont(font)
-
-    # Enable high DPI scaling
+    # Qt6 supports this rounding policy API
     app.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
+
+    # Font configuration
+    font = QFont()
+    font.setPointSize(10)
+    font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
+
+    font_families = [
+        "Segoe UI Variable Display",
+        "Segoe UI Variable Text",
+        "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "SimHei",
+        "Noto Sans CJK SC",
+        "Source Han Sans SC",
+        "WenQuanYi Micro Hei",
+        "Sans Serif",
+    ]
+
+    for font_name in font_families:
+        font.setFamily(font_name)
+        app.setFont(font)
+        # 这里只是尽量设置，不强依赖 exactMatch
+        break
 
     # Initialize database
     db = Database()
@@ -52,7 +77,6 @@ def main():
     window = MainWindow(db)
     window.show()
 
-    # Run application
     sys.exit(app.exec())
 
 

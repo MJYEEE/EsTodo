@@ -1,17 +1,17 @@
-"""Pomodoro timer window"""
+"""Pomodoro timer window - Windows 11 style"""
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QComboBox, QSpinBox, QProgressBar, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QFont, QIcon, QFontDatabase
 from typing import Optional
 from ..models.pomodoro import Pomodoro
 
 
 class PomodoroTimerWidget(QWidget):
-    """Pomodoro timer widget - integrated into main window"""
+    """Pomodoro timer widget - Windows 11 refined style"""
 
     timer_started = pyqtSignal(object)  # Emits Pomodoro
     timer_paused = pyqtSignal(object)  # Emits Pomodoro
@@ -23,6 +23,7 @@ class PomodoroTimerWidget(QWidget):
         super().__init__(parent)
         self.current_pomodoro: Optional[Pomodoro] = None
         self.timer = QTimer()
+        self.timer.setTimerType(Qt.TimerType.PreciseTimer)  # High precision timer
         self.time_remaining: int = 0  # seconds
         self.is_paused: bool = False
         self.current_todo_id: Optional[int] = None
@@ -38,187 +39,187 @@ class PomodoroTimerWidget(QWidget):
         self._update_colors()
 
     def _update_colors(self):
-        """Update colors based on theme"""
+        """Update colors based on theme - Windows 11 style"""
         if self.is_dark_mode:
-            timer_bg = "#1e293b"
-            todo_bg = "#334155"
-            todo_color = "#94a3b8"
-            time_color = "#f1f5f9"
-            status_color = "#94a3b8"
-            progress_bg = "#334155"
-            progress_chunk = "#4f46e5"
+            timer_bg = "#2d2d2d"
+            timer_border = "#404040"
+            todo_bg = "#363636"
+            todo_color = "#cccccc"
+            time_color = "#ffffff"
+            status_color = "#808080"
+            progress_bg = "#404040"
+            progress_chunk = "#60cdff"
         else:
-            timer_bg = "#f8fafc"
-            todo_bg = "#f1f5f9"
-            todo_color = "#64748b"
-            time_color = "#1e293b"
-            status_color = "#64748b"
-            progress_bg = "#e2e8f0"
-            progress_chunk = "#4f46e5"
+            timer_bg = "#ffffff"
+            timer_border = "#e0e0e0"
+            todo_bg = "#f3f3f3"
+            todo_color = "#606060"
+            time_color = "#000000"
+            status_color = "#a0a0a0"
+            progress_bg = "#e0e0e0"
+            progress_chunk = "#0078d4"
 
         self.timer_container.setStyleSheet(f"""
             QFrame {{
                 background-color: {timer_bg};
+                border: 1px solid {timer_border};
                 border-radius: 16px;
             }}
         """)
         self.todo_label.setStyleSheet(f"""
             color: {todo_color};
-            font-size: 12px;
-            padding: 8px;
+            font-size: 13px;
+            padding: 10px 14px;
             background-color: {todo_bg};
-            border-radius: 6px;
+            border-radius: 8px;
+            font-weight: 500;
         """)
         self.time_label.setStyleSheet(f"color: {time_color};")
-        self.status_label.setStyleSheet(f"color: {status_color}; font-size: 14px;")
+        self.status_label.setStyleSheet(f"color: {status_color}; font-size: 15px; font-weight: 500;")
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
                 border: none;
                 background-color: {progress_bg};
-                height: 8px;
-                border-radius: 4px;
+                height: 6px;
+                border-radius: 3px;
             }}
             QProgressBar::chunk {{
                 background-color: {progress_chunk};
-                border-radius: 4px;
+                border-radius: 3px;
             }}
         """)
 
     def _setup_ui(self):
-        """Setup the UI"""
-        self.setMinimumSize(400, 500)
+        """Setup the UI - Windows 11 refined design"""
+        self.setMinimumSize(420, 540)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(20)
+        layout.setSpacing(24)
         layout.setContentsMargins(24, 24, 24, 24)
 
-        # Mode selection
+        # Mode selection - Windows 11 segmented control style
         mode_layout = QHBoxLayout()
-        mode_layout.setSpacing(8)
+        mode_layout.setSpacing(6)
 
         self.work_mode_btn = QPushButton("工作")
+        self.work_mode_btn.setObjectName("modeButton")
         self.work_mode_btn.setCheckable(True)
         self.work_mode_btn.setChecked(True)
         self.work_mode_btn.setProperty("mode", "work")
+        self.work_mode_btn.setMinimumHeight(36)
         mode_layout.addWidget(self.work_mode_btn)
 
         self.short_break_btn = QPushButton("短休息")
+        self.short_break_btn.setObjectName("modeButton")
         self.short_break_btn.setCheckable(True)
         self.short_break_btn.setProperty("mode", "short_break")
+        self.short_break_btn.setMinimumHeight(36)
         mode_layout.addWidget(self.short_break_btn)
 
         self.long_break_btn = QPushButton("长休息")
+        self.long_break_btn.setObjectName("modeButton")
         self.long_break_btn.setCheckable(True)
         self.long_break_btn.setProperty("mode", "long_break")
+        self.long_break_btn.setMinimumHeight(36)
         mode_layout.addWidget(self.long_break_btn)
 
         layout.addLayout(mode_layout)
 
-        # Custom duration - hours, minutes, seconds
+        # Custom duration - cleaner layout
         custom_layout = QHBoxLayout()
-        custom_layout.addWidget(QLabel("自定义时长:"))
+        custom_layout.setSpacing(12)
+        custom_label = QLabel("自定义时长:")
+        custom_label.setStyleSheet("color: #606060; font-size: 13px; font-weight: 500;")
+        custom_layout.addWidget(custom_label)
+        custom_layout.addStretch()
 
         self.hour_spin = QSpinBox()
         self.hour_spin.setRange(0, 23)
         self.hour_spin.setValue(0)
         self.hour_spin.setSuffix(" 时")
+        self.hour_spin.setMinimumWidth(80)
         custom_layout.addWidget(self.hour_spin)
 
         self.minute_spin = QSpinBox()
         self.minute_spin.setRange(0, 59)
         self.minute_spin.setValue(25)
         self.minute_spin.setSuffix(" 分")
+        self.minute_spin.setMinimumWidth(80)
         custom_layout.addWidget(self.minute_spin)
 
         self.second_spin = QSpinBox()
         self.second_spin.setRange(0, 59)
         self.second_spin.setValue(0)
         self.second_spin.setSuffix(" 秒")
+        self.second_spin.setMinimumWidth(80)
         custom_layout.addWidget(self.second_spin)
 
         layout.addLayout(custom_layout)
 
-        # Linked todo (if any)
+        # Linked todo (if any) - Windows 11 style
         self.todo_label = QLabel()
-        self.todo_label.setStyleSheet("""
-            color: #64748b;
-            font-size: 12px;
-            padding: 8px;
-            background-color: #f1f5f9;
-            border-radius: 6px;
-        """)
         self.todo_label.setWordWrap(True)
         self.todo_label.hide()
         layout.addWidget(self.todo_label)
 
-        # Timer display
+        # Timer display - Windows 11 card style
         self.timer_container = QFrame()
         timer_layout = QVBoxLayout(self.timer_container)
-        timer_layout.setContentsMargins(24, 32, 24, 32)
+        timer_layout.setContentsMargins(32, 40, 32, 40)
+        timer_layout.setSpacing(20)
 
+        # Time display with modern font
         self.time_label = QLabel("25:00")
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        time_font = QFont()
-        time_font.setPointSize(48)
-        time_font.setBold(True)
+        time_font = QFont("Segoe UI Variable Display", 56, QFont.Weight.Bold)
+        time_font.setStyleHint(QFont.StyleHint.System)
+        time_font.setKerning(True)
         self.time_label.setFont(time_font)
-        self.time_label.setStyleSheet("color: #1e293b;")
         timer_layout.addWidget(self.time_label)
 
+        # Status label
         self.status_label = QLabel("准备开始")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: #64748b; font-size: 14px;")
         timer_layout.addWidget(self.status_label)
 
-        # Progress bar
+        # Progress bar - Windows 11 style
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                background-color: #e2e8f0;
-                height: 8px;
-                border-radius: 4px;
-            }
-            QProgressBar::chunk {
-                background-color: #4f46e5;
-                border-radius: 4px;
-            }
-        """)
         timer_layout.addWidget(self.progress_bar)
 
         layout.addWidget(self.timer_container, 1)
 
-        # Control buttons
+        # Control buttons - Windows 11 style
         control_layout = QHBoxLayout()
         control_layout.setSpacing(12)
 
         self.start_btn = QPushButton("开始")
         self.start_btn.setObjectName("primaryButton")
         self.start_btn.setMinimumHeight(48)
-        control_layout.addWidget(self.start_btn, 2)
+        self.start_btn.setMinimumWidth(140)
+        control_layout.addWidget(self.start_btn, 3)
 
         self.pause_btn = QPushButton("暂停")
         self.pause_btn.setObjectName("secondaryButton")
         self.pause_btn.setMinimumHeight(48)
         self.pause_btn.hide()
-        control_layout.addWidget(self.pause_btn, 1)
+        control_layout.addWidget(self.pause_btn, 2)
 
         self.stop_btn = QPushButton("停止")
-        self.stop_btn.setObjectName("dangerButton")
+        self.stop_btn.setObjectName("secondaryButton")
         self.stop_btn.setMinimumHeight(48)
         self.stop_btn.hide()
-        control_layout.addWidget(self.stop_btn, 1)
+        control_layout.addWidget(self.stop_btn, 2)
 
         layout.addLayout(control_layout)
 
-        # Pomodoro count
+        # Pomodoro count - Windows 11 style
         count_layout = QHBoxLayout()
         count_layout.addStretch()
         self.count_label = QLabel("今日完成: 0 个番茄")
-        self.count_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        self.count_label.setStyleSheet("color: #a0a0a0; font-size: 13px; font-weight: 500;")
         count_layout.addWidget(self.count_label)
         count_layout.addStretch()
         layout.addLayout(count_layout)
@@ -281,7 +282,7 @@ class PomodoroTimerWidget(QWidget):
         self.current_todo_title = todo_title
 
         if todo_id and todo_title:
-            self.todo_label.setText(f"关联: {todo_title}")
+            self.todo_label.setText(f"📎  {todo_title}")
             self.todo_label.show()
         else:
             self.todo_label.hide()
@@ -368,7 +369,7 @@ class PomodoroTimerWidget(QWidget):
         self.status_label.setText("完成！")
 
     def _update_time_display(self):
-        """Update the time display"""
+        """Update the time display - optimized"""
         hours = self.time_remaining // 3600
         remaining = self.time_remaining % 3600
         minutes = remaining // 60
@@ -379,7 +380,7 @@ class PomodoroTimerWidget(QWidget):
             self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
 
     def _update_progress(self):
-        """Update the progress bar"""
+        """Update the progress bar - optimized"""
         hours = self.hour_spin.value()
         minutes = self.minute_spin.value()
         seconds = self.second_spin.value()

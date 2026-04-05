@@ -1,17 +1,17 @@
-"""Todo tree widget"""
+"""Todo tree widget - Windows 11 style"""
 
 from PyQt6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QMenu
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDrag, QIcon, QColor
+from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QSize
+from PyQt6.QtGui import QDrag, QIcon, QColor, QFont
 from typing import Optional, List, Any
 from ..models.todo import Todo
 
 
 class TodoTreeItem(QTreeWidgetItem):
-    """Custom tree widget item for todos"""
+    """Custom tree widget item for todos - Windows 11 style"""
 
     def __init__(self, todo: Todo):
         super().__init__()
@@ -19,35 +19,37 @@ class TodoTreeItem(QTreeWidgetItem):
         self.update_display()
 
     def update_display(self):
-        """Update the display text"""
+        """Update the display text - Windows 11 refined"""
         title = self.todo.title
         if not title:
             title = "(无标题)"
 
-        self.setText(0, title)
+        # Add priority indicator in text
+        prefix = ""
+        if self.todo.priority == 3:  # High
+            prefix = "🔴 "
+        elif self.todo.priority == 2:  # Medium
+            prefix = "🟡 "
+        elif self.todo.priority == 1:  # Low
+            prefix = "🟢 "
+
+        self.setText(0, prefix + title)
 
         # Set font strikeout if completed
         font = self.font(0)
         font.setStrikeOut(self.todo.is_completed)
+        font.setPointSize(10)
         self.setFont(0, font)
 
-        # Set foreground color
+        # Set foreground color - Windows 11 style
         if self.todo.is_completed:
-            self.setForeground(0, QColor("#94a3b8"))
+            self.setForeground(0, QColor("#a0a0a0"))
         else:
-            self.setForeground(0, QColor("#1e293b"))
-
-        # Add priority indicator
-        if self.todo.priority == 3:  # High
-            self.setIcon(0, QIcon.fromTheme("emblem-important"))
-        elif self.todo.priority == 2:  # Medium
-            self.setIcon(0, QIcon())
-        else:  # Low
-            self.setIcon(0, QIcon())
+            self.setForeground(0, QColor("#000000"))
 
 
 class TodoTreeWidget(QWidget):
-    """Todo tree widget with drag and drop support"""
+    """Todo tree widget with smooth scrolling - Windows 11 style"""
 
     todo_selected = pyqtSignal(object)  # Emits Todo or None
     todo_double_clicked = pyqtSignal(object)  # Emits Todo
@@ -59,34 +61,44 @@ class TodoTreeWidget(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Setup the UI"""
+        """Setup the UI - Windows 11 refined layout"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
-        # Header with buttons
+        # Header with buttons - Windows 11 style
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
 
         title_label = QLabel("待办事项")
         title_label.setObjectName("headerLabel")
+        title_label.setStyleSheet("""
+            font-size: 24px;
+            font-weight: 700;
+            padding: 8px 0px;
+        """)
         header_layout.addWidget(title_label)
 
         header_layout.addStretch()
 
         self.add_button = QPushButton("+ 新建")
         self.add_button.setObjectName("primaryButton")
+        self.add_button.setMinimumHeight(36)
         header_layout.addWidget(self.add_button)
 
         self.add_child_button = QPushButton("+ 子待办")
         self.add_child_button.setObjectName("secondaryButton")
+        self.add_child_button.setMinimumHeight(36)
         header_layout.addWidget(self.add_child_button)
 
         self.delete_button = QPushButton("删除")
-        self.delete_button.setObjectName("dangerButton")
+        self.delete_button.setObjectName("secondaryButton")
+        self.delete_button.setMinimumHeight(36)
         header_layout.addWidget(self.delete_button)
 
         layout.addLayout(header_layout)
 
-        # Tree widget
+        # Tree widget - Windows 11 style with smooth scrolling
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setDragEnabled(True)
@@ -95,14 +107,20 @@ class TodoTreeWidget(QWidget):
         self.tree.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.setAnimated(True)
-        self.tree.setIndentation(20)
+        self.tree.setIndentation(28)
+        self.tree.setUniformRowHeights(True)  # Performance optimization
+        self.tree.setWordWrap(False)
+
+        # Smooth scrolling optimization
+        self.tree.setVerticalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
+        self.tree.setHorizontalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
 
         # Connect signals
         self.tree.itemSelectionChanged.connect(self._on_selection_changed)
         self.tree.itemDoubleClicked.connect(self._on_double_clicked)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
 
-        layout.addWidget(self.tree)
+        layout.addWidget(self.tree, 1)
 
     def set_todos(self, todos: List[Todo]):
         """Set the todos to display"""
@@ -125,13 +143,18 @@ class TodoTreeWidget(QWidget):
         self.tree.collapseAll()
 
     def _refresh_tree(self):
-        """Refresh the tree display"""
-        self.tree.clear()
+        """Refresh the tree display - optimized for performance"""
+        # Disable updates during refresh for smoother performance
+        self.tree.setUpdatesEnabled(False)
+        try:
+            self.tree.clear()
 
-        for todo in self.todos:
-            item = self._create_tree_item(todo)
-            self.tree.addTopLevelItem(item)
-            self._add_children(item, todo.children)
+            for todo in self.todos:
+                item = self._create_tree_item(todo)
+                self.tree.addTopLevelItem(item)
+                self._add_children(item, todo.children)
+        finally:
+            self.tree.setUpdatesEnabled(True)
 
     def _create_tree_item(self, todo: Todo) -> TodoTreeItem:
         """Create a tree item for a todo"""
@@ -155,12 +178,27 @@ class TodoTreeWidget(QWidget):
             self.todo_double_clicked.emit(item.todo)
 
     def _show_context_menu(self, position):
-        """Show context menu"""
+        """Show context menu - Windows 11 style"""
         item = self.tree.itemAt(position)
         if not item:
             return
 
         menu = QMenu(self)
+
+        # Windows 11 style menu styling
+        menu.setStyleSheet("""
+            QMenu {
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px 8px 12px;
+                border-radius: 6px;
+                margin: 2px;
+            }
+            QMenu::item:selected {
+                background-color: #f1f1f1;
+            }
+        """)
 
         add_action = menu.addAction("新建待办")
         add_child_action = menu.addAction("新建子待办")

@@ -44,10 +44,10 @@ class MainWindow(QMainWindow):
         self._apply_theme()
 
     def _setup_ui(self):
-        """Setup the UI"""
+        """Setup the UI - Windows 11 refined layout"""
         self.setWindowTitle("EsTodo")
-        self.setMinimumSize(1000, 700)
-        self.resize(1200, 800)
+        self.setMinimumSize(1100, 750)
+        self.resize(1280, 850)
 
         # Central widget
         central = QWidget()
@@ -57,80 +57,95 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Sidebar
+        # Sidebar - Windows 11 style with more padding
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(260)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(0, 16, 0, 16)
+        sidebar_layout.setContentsMargins(0, 20, 0, 20)
+        sidebar_layout.setSpacing(4)
 
-        # Logo / title
+        # Logo / title - Windows 11 style
         logo_label = QLabel("EsTodo")
+        logo_label.setObjectName("headerLabel")
         logo_label.setStyleSheet("""
-            font-size: 24px;
-            font-weight: bold;
-            padding: 12px 16px;
-            color: #4f46e5;
+            font-size: 28px;
+            font-weight: 700;
+            padding: 16px 20px 20px 20px;
         """)
         sidebar_layout.addWidget(logo_label)
 
-        # Navigation buttons
-        self.nav_todos = QPushButton("待办列表")
+        # Navigation buttons with icons (text-based for simplicity)
+        self.nav_todos = QPushButton("✓  待办列表")
         self.nav_todos.setObjectName("navButton")
         self.nav_todos.setCheckable(True)
         self.nav_todos.setChecked(True)
         self.nav_todos.clicked.connect(lambda: self._switch_page(0))
         sidebar_layout.addWidget(self.nav_todos)
 
-        self.nav_pomodoro = QPushButton("番茄钟")
+        self.nav_pomodoro = QPushButton("🍅  番茄钟")
         self.nav_pomodoro.setObjectName("navButton")
         self.nav_pomodoro.setCheckable(True)
         self.nav_pomodoro.clicked.connect(lambda: self._switch_page(1))
         sidebar_layout.addWidget(self.nav_pomodoro)
 
-        self.nav_calendar = QPushButton("番茄日历")
+        self.nav_calendar = QPushButton("📅  番茄日历")
         self.nav_calendar.setObjectName("navButton")
         self.nav_calendar.setCheckable(True)
         self.nav_calendar.clicked.connect(lambda: self._switch_page(2))
         sidebar_layout.addWidget(self.nav_calendar)
 
-        self.nav_stats = QPushButton("统计")
+        self.nav_stats = QPushButton("📊  统计")
         self.nav_stats.setObjectName("navButton")
         self.nav_stats.setCheckable(True)
         self.nav_stats.clicked.connect(lambda: self._switch_page(3))
         sidebar_layout.addWidget(self.nav_stats)
 
-        self.nav_settings = QPushButton("设置")
+        self.nav_settings = QPushButton("⚙️  设置")
         self.nav_settings.setObjectName("navButton")
         self.nav_settings.setCheckable(True)
         self.nav_settings.clicked.connect(lambda: self._switch_page(4))
         sidebar_layout.addWidget(self.nav_settings)
 
+        sidebar_layout.addSpacing(8)
         sidebar_layout.addStretch()
 
-        # Theme toggle button
-        self.theme_button = QPushButton("深色")
-        self.theme_button.setObjectName("navButton")
+        # Theme toggle button - more prominent
+        theme_container = QWidget()
+        theme_container.setContentsMargins(12, 0, 12, 0)
+        theme_layout = QVBoxLayout(theme_container)
+        theme_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.theme_button = QPushButton("🌙  深色模式")
+        self.theme_button.setObjectName("secondaryButton")
+        self.theme_button.setMinimumHeight(40)
         self.theme_button.clicked.connect(self._toggle_theme)
-        sidebar_layout.addWidget(self.theme_button)
+        theme_layout.addWidget(self.theme_button)
+
+        sidebar_layout.addWidget(theme_container)
 
         main_layout.addWidget(sidebar)
 
-        # Content area
+        # Content area - Windows 11 style with more padding
         content = QWidget()
         content.setObjectName("contentArea")
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
 
         # Page stack
         self.page_stack = QStackedWidget()
+        self.page_stack.setContentsMargins(0, 0, 0, 0)
 
         # Page 0: Todo list (with editor)
         todo_page = QWidget()
         todo_layout = QHBoxLayout(todo_page)
-        todo_layout.setContentsMargins(0, 0, 0, 0)
+        todo_layout.setContentsMargins(12, 12, 12, 12)
+        todo_layout.setSpacing(12)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(12)
+        splitter.setChildrenCollapsible(False)
 
         self.todo_tree = TodoTreeWidget()
         self.todo_tree.todo_selected.connect(self._on_todo_selected)
@@ -148,15 +163,15 @@ class MainWindow(QMainWindow):
         self.todo_editor.setVisible(False)
         splitter.addWidget(self.todo_editor)
 
-        splitter.setSizes([500, 700])
+        splitter.setSizes([520, 720])
         todo_layout.addWidget(splitter)
 
         self.page_stack.addWidget(todo_page)
 
-        # Page 1: Pomodoro Timer
+        # Page 1: Pomodoro Timer - with generous padding
         pomodoro_page = QWidget()
         pomodoro_layout = QVBoxLayout(pomodoro_page)
-        pomodoro_layout.setContentsMargins(32, 32, 32, 32)
+        pomodoro_layout.setContentsMargins(40, 40, 40, 40)
 
         # Create pomodoro widget
         self.pomodoro_widget = PomodoroTimerWidget()
@@ -176,20 +191,28 @@ class MainWindow(QMainWindow):
         # Update initial count
         self._update_pomodoro_count()
 
-        # Page 2: Calendar heatmap
+        # Page 2: Calendar heatmap - Windows 11 style
         calendar_page = QWidget()
         calendar_layout = QVBoxLayout(calendar_page)
-        calendar_layout.setContentsMargins(16, 16, 16, 16)
+        calendar_layout.setContentsMargins(24, 24, 24, 24)
+        calendar_layout.setSpacing(20)
 
         # Header
         calendar_header = QLabel("番茄日历")
         calendar_header.setObjectName("headerLabel")
         calendar_layout.addWidget(calendar_header)
 
-        # Create heatmap
+        # Create heatmap in a card container
+        heatmap_container = QWidget()
+        heatmap_container.setObjectName("card")
+        heatmap_layout = QVBoxLayout(heatmap_container)
+        heatmap_layout.setContentsMargins(20, 20, 20, 20)
+
         self.heatmap = HeatmapCalendar()
         self.heatmap.date_clicked.connect(self._on_date_clicked)
-        calendar_layout.addWidget(self.heatmap, 1)
+        heatmap_layout.addWidget(self.heatmap)
+
+        calendar_layout.addWidget(heatmap_container, 1)
 
         self.page_stack.addWidget(calendar_page)
 
@@ -294,12 +317,12 @@ class MainWindow(QMainWindow):
         """Toggle between light and dark theme"""
         if self.current_theme == Theme.LIGHT:
             self.current_theme = Theme.DARK
-            self.theme_button.setText("浅色")
+            self.theme_button.setText("☀️  浅色模式")
             if self.pomodoro_widget:
                 self.pomodoro_widget.set_dark_mode(True)
         else:
             self.current_theme = Theme.LIGHT
-            self.theme_button.setText("深色")
+            self.theme_button.setText("🌙  深色模式")
             if self.pomodoro_widget:
                 self.pomodoro_widget.set_dark_mode(False)
         self._apply_theme()
