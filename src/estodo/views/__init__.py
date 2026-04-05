@@ -6,6 +6,8 @@ from .todo_editor import TodoEditor
 from .pomodoro_timer import PomodoroTimerWidget
 from .heatmap import HeatmapCalendar
 from .day_detail_dialog import DayDetailDialog
+from .tag_dialog import TagManagerDialog
+from .tag_selector import TagSelectorDialog, TagDisplayWidget
 
 __all__ = [
     "MainWindow",
@@ -14,4 +16,7 @@ __all__ = [
     "PomodoroTimerWidget",
     "HeatmapCalendar",
     "DayDetailDialog",
+    "TagManagerDialog",
+    "TagSelectorDialog",
+    "TagDisplayWidget",
 ]

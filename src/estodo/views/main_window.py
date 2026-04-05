@@ -16,10 +16,12 @@ from .todo_editor import TodoEditor
 from .pomodoro_timer import PomodoroTimerWidget
 from .heatmap import HeatmapCalendar
 from .day_detail_dialog import DayDetailDialog
+from .tag_dialog import TagManagerDialog
 from .notifications import notify
 from ..database import Database
 from ..models.todo import TodoModel, Todo
 from ..models.pomodoro import PomodoroModel, Pomodoro
+from ..models.tag import TagModel, Tag
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +32,7 @@ class MainWindow(QMainWindow):
         self.db = db
         self.todo_model = TodoModel(db)
         self.pomodoro_model = PomodoroModel(db)
+        self.tag_model = TagModel(db)
         self.current_todo: Optional[Todo] = None
         self.current_theme = Theme.LIGHT
         self.pomodoro_widget: Optional[PomodoroTimerWidget] = None
@@ -136,7 +139,7 @@ class MainWindow(QMainWindow):
         self.todo_tree.start_pomodoro_for_todo.connect(self._start_pomodoro_for_todo)
         splitter.addWidget(self.todo_tree)
 
-        self.todo_editor = TodoEditor()
+        self.todo_editor = TodoEditor(self.tag_model)
         self.todo_editor.todo_saved.connect(self._on_todo_saved)
         self.todo_editor.todo_deleted.connect(self._on_todo_deleted)
         self.todo_editor.edit_cancelled.connect(self._on_edit_cancelled)
@@ -258,6 +261,13 @@ class MainWindow(QMainWindow):
         toggle_theme.triggered.connect(self._toggle_theme)
         view_menu.addAction(toggle_theme)
 
+        # Manage menu
+        manage_menu = menubar.addMenu("管理(&M)")
+
+        manage_tags = QAction("标签管理(&G)...", self)
+        manage_tags.triggered.connect(self._open_tag_manager)
+        manage_menu.addAction(manage_tags)
+
         # Help menu
         help_menu = menubar.addMenu("帮助(&H)")
 
@@ -344,6 +354,10 @@ class MainWindow(QMainWindow):
             self.todo_model.update(todo)
         else:
             self.todo_model.create(todo)
+
+        # Save tags
+        if todo.id:
+            self.tag_model.set_todo_tags(todo.id, self.todo_editor.selected_tag_ids)
 
         self.current_todo = None
         self.todo_editor.clear()
@@ -443,3 +457,20 @@ class MainWindow(QMainWindow):
         """Handle date click in heatmap"""
         dialog = DayDetailDialog(date, self.pomodoro_model, self.todo_model, self)
         dialog.exec()
+
+    def _open_tag_manager(self):
+        """Open tag manager dialog"""
+        dialog = TagManagerDialog(self.tag_model, self)
+        dialog.tag_changed.connect(self._on_tags_changed)
+        dialog.exec()
+
+    def _on_tags_changed(self):
+        """Handle tags changed"""
+        # Refresh the todo editor if it's open and has a todo
+        if self.todo_editor.isVisible() and self.todo_editor.todo and self.todo_editor.todo.id:
+            # Reload tags for the current todo
+            self.todo_editor.selected_tag_ids = [
+                t.id for t in self.tag_model.get_by_todo_id(self.todo_editor.todo.id)
+                if t.id
+            ]
+            self.todo_editor._update_tag_display()

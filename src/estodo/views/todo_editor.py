@@ -5,9 +5,11 @@ from PyQt6.QtWidgets import (
     QLineEdit, QTextEdit, QComboBox, QCheckBox, QSplitter
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from typing import Optional
+from typing import Optional, List
 from ..models.todo import Todo
+from ..models.tag import TagModel, Tag
 from .markdown import render_markdown
+from .tag_selector import TagSelectorDialog, TagDisplayWidget
 
 
 class TodoEditor(QWidget):
@@ -17,9 +19,11 @@ class TodoEditor(QWidget):
     todo_deleted = pyqtSignal(object)  # Emits Todo
     edit_cancelled = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, tag_model: Optional[TagModel] = None, parent=None):
         super().__init__(parent)
         self.todo: Optional[Todo] = None
+        self.tag_model = tag_model
+        self.selected_tag_ids: List[int] = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -76,6 +80,14 @@ class TodoEditor(QWidget):
 
         layout.addLayout(meta_layout)
 
+        # Tags row
+        if self.tag_model:
+            tags_layout = QHBoxLayout()
+            self.tag_display = TagDisplayWidget()
+            self.tag_display.clicked.connect(self._open_tag_selector)
+            tags_layout.addWidget(self.tag_display)
+            layout.addLayout(tags_layout)
+
         # Content editor with preview splitter
         layout.addWidget(QLabel("内容 (Markdown):"))
 
@@ -104,6 +116,8 @@ class TodoEditor(QWidget):
     def set_todo(self, todo: Optional[Todo]):
         """Set the todo to edit"""
         self.todo = todo
+        self.selected_tag_ids = []
+
         if todo:
             self.title_label.setText(f"编辑待办 - #{todo.id}" if todo.id else "新建待办")
             self.title_input.setText(todo.title)
@@ -112,6 +126,12 @@ class TodoEditor(QWidget):
             self.completed_check.setChecked(todo.is_completed)
             self.delete_button.setVisible(todo.id is not None)
             self._update_preview()
+
+            # Load tags
+            if todo.id and self.tag_model:
+                tags = self.tag_model.get_by_todo_id(todo.id)
+                self.selected_tag_ids = [t.id for t in tags if t.id]
+                self._update_tag_display()
         else:
             self.title_label.setText("新建待办")
             self.title_input.clear()
@@ -120,6 +140,10 @@ class TodoEditor(QWidget):
             self.completed_check.setChecked(False)
             self.delete_button.setVisible(False)
             self.preview.setHtml("<div style='color: #64748b; padding: 8px;'>预览...</div>")
+
+            # Clear tags
+            if self.tag_model:
+                self._update_tag_display()
 
     def clear(self):
         """Clear the editor"""
@@ -157,3 +181,30 @@ class TodoEditor(QWidget):
         """Handle delete button"""
         if self.todo and self.todo.id:
             self.todo_deleted.emit(self.todo)
+
+    def _open_tag_selector(self):
+        """Open tag selector dialog"""
+        if not self.tag_model:
+            return
+
+        dialog = TagSelectorDialog(self.tag_model, self.selected_tag_ids, self)
+        dialog.tags_selected.connect(self._on_tags_selected)
+        dialog.exec()
+
+    def _on_tags_selected(self, tag_ids: List[int]):
+        """Handle tags selected"""
+        self.selected_tag_ids = tag_ids
+        self._update_tag_display()
+
+    def _update_tag_display(self):
+        """Update the tag display widget"""
+        if not self.tag_model:
+            return
+
+        tags = []
+        for tag_id in self.selected_tag_ids:
+            tag = self.tag_model.get_by_id(tag_id)
+            if tag:
+                tags.append(tag)
+
+        self.tag_display.set_tags(tags)
