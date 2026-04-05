@@ -1,0 +1,11 @@
+# GUI Framework
+PyQt6==6.7.0
+
+# Markdown Parser
+mistune==3.0.2
+
+# Cross-platform notifications
+plyer==2.1.0
+
+# Packaging (for building exe)
+pyinstaller==6.9.0
