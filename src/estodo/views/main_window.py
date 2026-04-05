@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QSplitter, QFrame,
-    QMessageBox
+    QMessageBox, QFileDialog
 )
 from PyQt6.QtCore import Qt, QSize, QDate
 from PyQt6.QtGui import QAction, QIcon
@@ -22,6 +22,7 @@ from ..database import Database
 from ..models.todo import TodoModel, Todo
 from ..models.pomodoro import PomodoroModel, Pomodoro
 from ..models.tag import TagModel, Tag
+from ..import_export import ImportExport
 
 
 class MainWindow(QMainWindow):
@@ -33,6 +34,7 @@ class MainWindow(QMainWindow):
         self.todo_model = TodoModel(db)
         self.pomodoro_model = PomodoroModel(db)
         self.tag_model = TagModel(db)
+        self.import_export = ImportExport(db)
         self.current_todo: Optional[Todo] = None
         self.current_theme = Theme.LIGHT
         self.pomodoro_widget: Optional[PomodoroTimerWidget] = None
@@ -240,11 +242,11 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
 
         import_action = QAction("导入(&I)...", self)
-        import_action.setEnabled(False)
+        import_action.triggered.connect(self._import_data)
         file_menu.addAction(import_action)
 
         export_action = QAction("导出(&E)...", self)
-        export_action.setEnabled(False)
+        export_action.triggered.connect(self._export_data)
         file_menu.addAction(export_action)
 
         file_menu.addSeparator()
@@ -474,3 +476,85 @@ class MainWindow(QMainWindow):
                 if t.id
             ]
             self.todo_editor._update_tag_display()
+
+    def _export_data(self):
+        """Export data to JSON file"""
+        # Get default filename
+        from datetime import datetime
+        default_name = f"estodo_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出数据",
+            default_name,
+            "JSON 文件 (*.json);;所有文件 (*)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            from pathlib import Path
+            self.import_export.export_all(Path(file_path))
+            QMessageBox.information(
+                self,
+                "导出成功",
+                f"数据已成功导出到：\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "导出失败",
+                f"导出时出错：\n{str(e)}"
+            )
+
+    def _import_data(self):
+        """Import data from JSON file"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "导入数据",
+            "",
+            "JSON 文件 (*.json);;所有文件 (*)"
+        )
+
+        if not file_path:
+            return
+
+        # Ask whether to replace or merge
+        reply = QMessageBox.question(
+            self,
+            "导入选项",
+            "是否替换现有数据？\n\n"
+            "「是」 - 删除所有现有数据，然后导入\n"
+            "「否」 - 保留现有数据，合并导入（可能重复）",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel
+        )
+
+        if reply == QMessageBox.StandardButton.Cancel:
+            return
+
+        replace = (reply == QMessageBox.StandardButton.Yes)
+
+        try:
+            from pathlib import Path
+            counts = self.import_export.import_all(Path(file_path), replace=replace)
+
+            # Refresh UI
+            self._load_todos()
+            self._update_heatmap()
+
+            QMessageBox.information(
+                self,
+                "导入成功",
+                f"数据已成功导入！\n\n"
+                f"标签：{counts['tags']} 个\n"
+                f"待办：{counts['todos']} 个\n"
+                f"番茄钟：{counts['pomodoros']} 个"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "导入失败",
+                f"导入时出错：\n{str(e)}"
+            )
