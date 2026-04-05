@@ -36,30 +36,17 @@ echo ""
 echo "Cleaning previous builds..."
 rm -rf build dist
 
-# Build with PyInstaller
+# Build with PyInstaller using spec file
 echo ""
-echo "Building with PyInstaller..."
+echo "Building with PyInstaller (using estodo.spec)..."
 
 if [ -f "assets/icon.ico" ]; then
     echo "✓ Using icon: assets/icon.ico"
-    pyinstaller \
-        --name "EsTodo" \
-        --windowed \
-        --onefile \
-        --clean \
-        --icon "assets/icon.ico" \
-        --add-data "src/estodo:estodo" \
-        src/estodo/main.py
 else
     echo "⚠ Icon not found at assets/icon.ico, building without icon"
-    pyinstaller \
-        --name "EsTodo" \
-        --windowed \
-        --onefile \
-        --clean \
-        --add-data "src/estodo:estodo" \
-        src/estodo/main.py
 fi
+
+pyinstaller estodo.spec
 
 echo ""
 echo "✓ Build successful!"

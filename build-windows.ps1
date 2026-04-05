@@ -38,32 +38,17 @@ Write-Host "Cleaning previous builds..." -ForegroundColor Cyan
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
 if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 
-# Build with PyInstaller
+# Build with PyInstaller using spec file
 Write-Host ""
-Write-Host "Building with PyInstaller..." -ForegroundColor Cyan
+Write-Host "Building with PyInstaller (using estodo.spec)..." -ForegroundColor Cyan
 
-# Simple one-file build
-$iconPath = "assets/icon.ico"
-if (Test-Path $iconPath) {
-    Write-Host "✓ Using icon: $iconPath" -ForegroundColor Green
-    pyinstaller `
-        --name "EsTodo" `
-        --windowed `
-        --onefile `
-        --clean `
-        --icon $iconPath `
-        --add-data "src/estodo;estodo" `
-        src/estodo/main.py
+if (Test-Path "assets/icon.ico") {
+    Write-Host "✓ Using icon: assets/icon.ico" -ForegroundColor Green
 } else {
-    Write-Host "⚠ Icon not found at $iconPath, building without icon" -ForegroundColor Yellow
-    pyinstaller `
-        --name "EsTodo" `
-        --windowed `
-        --onefile `
-        --clean `
-        --add-data "src/estodo;estodo" `
-        src/estodo/main.py
+    Write-Host "⚠ Icon not found at assets/icon.ico, building without icon" -ForegroundColor Yellow
 }
+
+pyinstaller estodo.spec
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

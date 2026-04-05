@@ -15,11 +15,19 @@ block_cipher = None
 # Paths
 src_path = Path("src")
 
+# Determine icon path
+icon_path = "assets/icon.ico" if os.path.exists("assets/icon.ico") else None
+
+# Collect datas - need to add the estodo package
+datas = [
+    (str(src_path / "estodo"), "estodo"),
+]
+
 a = Analysis(
     [str(src_path / "estodo" / "main.py")],
     pathex=[str(src_path)],
     binaries=[],
-    datas=[],
+    datas=datas,
     hiddenimports=[
         "plyer.platforms.linux.notification",
         "plyer.platforms.win.notification",
@@ -40,29 +48,22 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name="EsTodo",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="assets/icon.ico" if os.path.exists("assets/icon.ico") else None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="EsTodo",
+    icon=icon_path,
 )

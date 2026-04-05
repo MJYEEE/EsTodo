@@ -29,11 +29,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          if (Test-Path "assets/icon.ico") {
-            pyinstaller --onefile --windowed --name "EsTodo" --icon "assets/icon.ico" --add-data "src/estodo;estodo" src/estodo/main.py
-          } else {
-            pyinstaller --onefile --windowed --name "EsTodo" --add-data "src/estodo;estodo" src/estodo/main.py
-          }
+          pyinstaller estodo.spec
 
       - name: Create zip archive
         shell: bash
@@ -69,11 +65,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          if [ -f "assets/icon.ico" ]; then
-            pyinstaller --onefile --windowed --name "EsTodo" --icon "assets/icon.ico" --add-data "src/estodo:estodo" src/estodo/main.py
-          else
-            pyinstaller --onefile --windowed --name "EsTodo" --add-data "src/estodo:estodo" src/estodo/main.py
-          fi
+          pyinstaller estodo.spec
 
       - name: Create tar.gz archive
         run: |
