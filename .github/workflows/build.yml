@@ -1,0 +1,110 @@
+name: Build EsTodo
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "EsTodo" --add-data "src/estodo;estodo" src/estodo/main.py
+
+      - name: Create zip archive
+        shell: bash
+        run: |
+          cd dist
+          7z a -tzip "../EsTodo-windows.zip" EsTodo.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EsTodo-windows
+          path: EsTodo-windows.zip
+
+  build-linux:
+    name: Build on Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "EsTodo" --add-data "src/estodo:estodo" src/estodo/main.py
+
+      - name: Create tar.gz archive
+        run: |
+          cd dist
+          chmod +x EsTodo
+          tar -czf ../EsTodo-linux.tar.gz EsTodo
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EsTodo-linux
+          path: EsTodo-linux.tar.gz
+
+  create-release:
+    name: Create Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: EsTodo-windows
+
+      - name: Download Linux build
+        uses: actions/download-artifact@v4
+        with:
+          name: EsTodo-linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            EsTodo-windows.zip
+            EsTodo-linux.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

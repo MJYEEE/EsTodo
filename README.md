@@ -2,6 +2,13 @@
 
 待办事项 + 番茄钟应用
 
+## 📦 快速下载
+
+从 [Releases](https://github.com/你的用户名/EsTodo/releases) 页面下载最新版本：
+
+- **Windows**: `EsTodo-windows.zip` - 解压后直接运行 `EsTodo.exe`
+- **Linux**: `EsTodo-linux.tar.gz` - 解压后运行 `EsTodo`
+
 ## 功能特性
 
 - ✅ 待办事项管理（增删改查）
@@ -17,6 +24,8 @@
 - ✅ 点击日期查看当天番茄钟详情
 - ✅ 标签系统（新建/编辑/删除标签，待办可关联标签）
 - ✅ JSON 导入导出（备份/迁移数据）
+- ✅ PyInstaller 打包（Windows/Linux 单文件 exe）
+- ✅ GitHub Actions CI/CD（自动构建 Release）
 
 ## 安装
 
@@ -51,39 +60,6 @@ python -m estodo.main
 python src/estodo/main.py
 ```
 
-## 项目结构
-
-```
-EsTodo/
-├── src/
-│   └── estodo/
-│       ├── __init__.py
-│       ├── main.py              # 入口
-│       ├── database.py          # 数据库管理
-│       ├── import_export.py     # 导入导出功能
-│       ├── models/              # 数据模型
-│       │   ├── __init__.py
-│       │   ├── todo.py
-│       │   ├── pomodoro.py
-│       │   └── tag.py
-│       └── views/               # UI 组件
-│           ├── __init__.py
-│           ├── main_window.py
-│           ├── todo_tree.py
-│           ├── todo_editor.py
-│           ├── pomodoro_timer.py
-│           ├── heatmap.py
-│           ├── day_detail_dialog.py
-│           ├── tag_dialog.py
-│           ├── tag_selector.py
-│           ├── notifications.py
-│           ├── theme.py
-│           └── markdown.py
-├── requirements.txt
-├── README.md
-└── run.sh
-```
-
 ## 开发计划
 
 ### v0.1
@@ -106,12 +82,12 @@ EsTodo/
 ### v0.4
 - 标签系统（新建/编辑/删除标签，待办可关联标签）
 
-### v0.5 (当前)
+### v0.5
 - JSON 导入导出（备份/迁移数据）
 
-### v0.6
-- PyInstaller 打包
-- GitHub Actions CI/CD
+### v0.6 (当前)
+- PyInstaller 打包（Windows/Linux 单文件 exe）
+- GitHub Actions CI/CD（自动构建 Release）
 
 ## 快捷键
 
@@ -143,6 +119,87 @@ EsTodo/
 4. 点击「确定」
 
 导入后会显示导入的统计信息。
+
+## 打包与发布
+
+### Windows 本地打包
+
+```powershell
+# 在 PowerShell 中运行
+.\build-windows.ps1
+```
+
+### Linux 本地打包
+
+```bash
+# 在 Bash 中运行
+./build-linux.sh
+```
+
+### GitHub Actions CI/CD
+
+**打标签并发布：**
+
+```bash
+# 打版本标签
+git tag -a v0.6.0 -m "Release v0.6.0"
+git push origin v0.6.0
+```
+
+GitHub Actions 会自动：
+1. 在 Windows 和 Linux 上构建
+2. 生成 `EsTodo-windows.zip` 和 `EsTodo-linux.tar.gz`
+3. 创建 GitHub Release 并上传构建产物
+
+**手动触发构建：**
+
+也可以在 GitHub 仓库的 Actions 页面手动触发工作流。
+
+### 下载使用
+
+从 [Releases](https://github.com/MJYEEE/EsTodo/releases) 页面下载：
+
+- **Windows**: 下载 `EsTodo-windows.zip`，解压后直接运行 `EsTodo.exe`
+- **Linux**: 下载 `EsTodo-linux.tar.gz`，解压后运行 `EsTodo`
+
+## 项目结构
+
+```
+EsTodo/
+├── .github/
+│   └── workflows/
+│       └── build.yml          # GitHub Actions 构建配置
+├── src/
+│   └── estodo/
+│       ├── __init__.py
+│       ├── main.py              # 入口
+│       ├── database.py          # 数据库管理
+│       ├── import_export.py     # 导入导出功能
+│       ├── models/              # 数据模型
+│       │   ├── __init__.py
+│       │   ├── todo.py
+│       │   ├── pomodoro.py
+│       │   └── tag.py
+│       └── views/               # UI 组件
+│           ├── __init__.py
+│           ├── main_window.py
+│           ├── todo_tree.py
+│           ├── todo_editor.py
+│           ├── pomodoro_timer.py
+│           ├── heatmap.py
+│           ├── day_detail_dialog.py
+│           ├── tag_dialog.py
+│           ├── tag_selector.py
+│           ├── notifications.py
+│           ├── theme.py
+│           └── markdown.py
+├── estodo.spec                  # PyInstaller spec 文件
+├── build-windows.ps1           # Windows 打包脚本
+├── build-linux.sh              # Linux 打包脚本
+├── requirements.txt
+├── README.md
+└── run.sh
+```
 
 ## License
 
