@@ -61,26 +61,26 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(logo_label)
 
         # Navigation buttons
-        self.nav_todos = QPushButton("📋 待办列表")
+        self.nav_todos = QPushButton("待办列表")
         self.nav_todos.setObjectName("navButton")
         self.nav_todos.setCheckable(True)
         self.nav_todos.setChecked(True)
         self.nav_todos.clicked.connect(lambda: self._switch_page(0))
         sidebar_layout.addWidget(self.nav_todos)
 
-        self.nav_calendar = QPushButton("📊 番茄日历")
+        self.nav_calendar = QPushButton("番茄日历")
         self.nav_calendar.setObjectName("navButton")
         self.nav_calendar.setCheckable(True)
         self.nav_calendar.clicked.connect(lambda: self._switch_page(1))
         sidebar_layout.addWidget(self.nav_calendar)
 
-        self.nav_stats = QPushButton("📈 统计")
+        self.nav_stats = QPushButton("统计")
         self.nav_stats.setObjectName("navButton")
         self.nav_stats.setCheckable(True)
         self.nav_stats.clicked.connect(lambda: self._switch_page(2))
         sidebar_layout.addWidget(self.nav_stats)
 
-        self.nav_settings = QPushButton("⚙️ 设置")
+        self.nav_settings = QPushButton("设置")
         self.nav_settings.setObjectName("navButton")
         self.nav_settings.setCheckable(True)
         self.nav_settings.clicked.connect(lambda: self._switch_page(3))
@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Theme toggle button
-        self.theme_button = QPushButton("🌙 深色")
+        self.theme_button = QPushButton("深色")
         self.theme_button.setObjectName("navButton")
         self.theme_button.clicked.connect(self._toggle_theme)
         sidebar_layout.addWidget(self.theme_button)
@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
         # Page 1: Calendar (placeholder)
         calendar_page = QWidget()
         calendar_layout = QVBoxLayout(calendar_page)
-        calendar_label = QLabel("📊 番茄日历 - 即将推出")
+        calendar_label = QLabel("番茄日历 - 即将推出")
         calendar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         calendar_label.setStyleSheet("font-size: 18px; color: #64748b;")
         calendar_layout.addWidget(calendar_label)
@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         # Page 2: Stats (placeholder)
         stats_page = QWidget()
         stats_layout = QVBoxLayout(stats_page)
-        stats_label = QLabel("📈 统计 - 即将推出")
+        stats_label = QLabel("统计 - 即将推出")
         stats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stats_label.setStyleSheet("font-size: 18px; color: #64748b;")
         stats_layout.addWidget(stats_label)
@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
         # Page 3: Settings (placeholder)
         settings_page = QWidget()
         settings_layout = QVBoxLayout(settings_page)
-        settings_label = QLabel("⚙️ 设置 - 即将推出")
+        settings_label = QLabel("设置 - 即将推出")
         settings_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         settings_label.setStyleSheet("font-size: 18px; color: #64748b;")
         settings_layout.addWidget(settings_label)
@@ -225,10 +225,10 @@ class MainWindow(QMainWindow):
         """Toggle between light and dark theme"""
         if self.current_theme == Theme.LIGHT:
             self.current_theme = Theme.DARK
-            self.theme_button.setText("☀️ 浅色")
+            self.theme_button.setText("浅色")
         else:
             self.current_theme = Theme.LIGHT
-            self.theme_button.setText("🌙 深色")
+            self.theme_button.setText("深色")
         self._apply_theme()
 
     def _apply_theme(self):

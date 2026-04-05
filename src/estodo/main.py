@@ -22,8 +22,22 @@ def main():
     app.setApplicationName("EsTodo")
     app.setOrganizationName("EsTodo")
 
-    # Set default font
-    font = QFont("Noto Sans", 10)
+    # Set default font - support Chinese characters
+    font = QFont()
+    font.setPointSize(10)
+    # Try common Chinese fonts in order of priority
+    chinese_fonts = [
+        "Microsoft YaHei",  # 微软雅黑
+        "SimHei",           # 黑体
+        "WenQuanYi Micro Hei",  # 文泉驿微米黑
+        "Noto Sans CJK SC", # Noto CJK 简体中文
+        "Source Han Sans SC", # 思源黑体
+        "Sans Serif",       # 通用无衬线
+    ]
+    for font_name in chinese_fonts:
+        font.setFamily(font_name)
+        if font.exactMatch():
+            break
     app.setFont(font)
 
     # Enable high DPI scaling
