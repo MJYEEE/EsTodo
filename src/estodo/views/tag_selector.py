@@ -163,7 +163,7 @@ class TagSelectorDialog(QDialog):
     def _on_ok(self):
         """Handle OK button"""
         selected_ids = [
-            w.tag.id for w in self.tag_widget
+            w.tag.id for w in self.tag_widgets
             if w.is_checked() and w.tag.id is not None
         ]
         self.tags_selected.emit(selected_ids)
@@ -210,8 +210,10 @@ class TagDisplayWidget(QWidget):
         """Refresh the tag display"""
         # Clear existing
         for i in reversed(range(self.tags_layout.count())):
-            self.tags_layout.itemAt(i).widget().setParent(None)
-
+            item = self.tags_layout.itemAt(i)
+            if item and item.widget():
+                item.widget().setParent(None)
+                
         if not self.tags:
             no_label = QLabel("(无标签)")
             no_label.setStyleSheet("color: #94a3b8; font-style: italic;")
