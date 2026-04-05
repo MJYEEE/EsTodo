@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QListWidget, QListWidgetItem, QPushButton, QFrame
+    QListWidget, QListWidgetItem, QPushButton, QFrame, QWidget
 )
 from PyQt6.QtCore import Qt, QDate
 from typing import Optional, List
@@ -26,10 +26,25 @@ class PomodoroListItem(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(12)
 
-        # Icon/status indicator
-        status_label = QLabel("✅" if self.pomodoro.is_completed else "⏹️")
-        status_label.setFixedWidth(28)
+        # Icon/status indicator - colored dot
+        status_label = QLabel()
+        status_label.setFixedSize(16, 16)
+        if self.pomodoro.is_completed:
+            status_label.setStyleSheet("""
+                QLabel {
+                    background-color: #22c55e;
+                    border-radius: 8px;
+                }
+            """)
+        else:
+            status_label.setStyleSheet("""
+                QLabel {
+                    background-color: #94a3b8;
+                    border-radius: 8px;
+                }
+            """)
         layout.addWidget(status_label)
+        layout.addSpacing(8)
 
         # Time and duration
         time_layout = QVBoxLayout()
@@ -45,7 +60,7 @@ class PomodoroListItem(QWidget):
         else:
             time_label = QLabel("(未知时间)")
 
-        time_label.setStyleSheet("font-weight: 500; color: #1e293b;")
+        time_label.setStyleSheet("font-weight: 600; color: #1e293b; font-size: 14px;")
         time_layout.addWidget(time_label)
 
         duration_label = QLabel(f"{self.pomodoro.duration} 分钟")
@@ -56,8 +71,14 @@ class PomodoroListItem(QWidget):
 
         # Linked todo if any
         if self.todo:
-            todo_label = QLabel(f"📋 {self.todo.title}")
-            todo_label.setStyleSheet("color: #4f46e5; font-size: 12px;")
+            todo_label = QLabel(self.todo.title)
+            todo_label.setStyleSheet("""
+                color: #4f46e5;
+                font-size: 12px;
+                background-color: #eef2ff;
+                padding: 4px 8px;
+                border-radius: 4px;
+            """)
             todo_label.setWordWrap(True)
             layout.addWidget(todo_label, 2)
 
@@ -82,26 +103,37 @@ class DayDetailDialog(QDialog):
         self._load_pomodoros()
 
     def _setup_ui(self):
-        """Setup the UI"""
+        """Setup the UI with better styling"""
         self.setWindowTitle(f"番茄钟 - {self.date.toString('yyyy年MM月dd日 dddd')}")
-        self.setMinimumSize(500, 400)
-        self.resize(600, 500)
+        self.setMinimumSize(520, 420)
+        self.resize(620, 520)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        layout.setContentsMargins(24, 24, 24, 24)
 
         # Header
         header_layout = QHBoxLayout()
 
         date_label = QLabel(self.date.toString("yyyy年MM月dd日 dddd"))
-        date_label.setStyleSheet("font-size: 18px; font-weight: 600; color: #1e293b;")
+        date_label.setStyleSheet("""
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        """)
         header_layout.addWidget(date_label)
 
         header_layout.addStretch()
 
         self.count_label = QLabel()
-        self.count_label.setStyleSheet("color: #64748b; font-size: 14px;")
+        self.count_label.setStyleSheet("""
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 500;
+            background-color: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 6px;
+        """)
         header_layout.addWidget(self.count_label)
 
         layout.addLayout(header_layout)
@@ -116,15 +148,21 @@ class DayDetailDialog(QDialog):
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
             QListWidget {
-                border: none;
-                background-color: #f8fafc;
-                border-radius: 8px;
+                border: 1px solid #e2e8f0;
+                background-color: #ffffff;
+                border-radius: 12px;
+                padding: 8px;
             }
             QListWidget::item {
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid #f1f5f9;
+                border-radius: 8px;
+                margin: 4px 0;
             }
             QListWidget::item:last {
                 border-bottom: none;
+            }
+            QListWidget::item:hover {
+                background-color: #f8fafc;
             }
         """)
         layout.addWidget(self.list_widget, 1)

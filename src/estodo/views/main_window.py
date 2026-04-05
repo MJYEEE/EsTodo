@@ -177,7 +177,7 @@ class MainWindow(QMainWindow):
         calendar_layout.setContentsMargins(16, 16, 16, 16)
 
         # Header
-        calendar_header = QLabel("🍅 番茄日历")
+        calendar_header = QLabel("番茄日历")
         calendar_header.setObjectName("headerLabel")
         calendar_layout.addWidget(calendar_header)
 

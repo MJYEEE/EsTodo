@@ -19,7 +19,7 @@ class HeatmapCell(QWidget):
         super().__init__(parent)
         self.date = date
         self.count = count
-        self.setFixedSize(20, 20)
+        self.setFixedSize(22, 22)
         self.setToolTip(self._get_tooltip_text())
         self._is_hovered = False
 
@@ -40,31 +40,46 @@ class HeatmapCell(QWidget):
         self.update()
 
     def get_color(self) -> QColor:
-        """Get the color based on count"""
+        """Get the color based on count - tomato red theme"""
         if self.count == 0:
-            return QColor("#f1f5f9")  # Light gray
+            return QColor("#f8fafc")  # Very light gray
         elif self.count == 1:
-            return QColor("#dbeafe")  # Light blue
+            return QColor("#fef2f2")  # Lightest red
         elif self.count == 2:
-            return QColor("#93c5fd")
+            return QColor("#fecaca")  # Light red
         elif self.count == 3:
-            return QColor("#3b82f6")
+            return QColor("#f87171")  # Medium red
+        elif self.count == 4:
+            return QColor("#dc2626")  # Dark red
         else:
-            return QColor("#1d4ed8")  # Dark blue
+            return QColor("#991b1b")  # Darkest red
 
     def paintEvent(self, event):
-        """Paint the cell"""
+        """Paint the cell with better styling"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Draw background
         color = self.get_color()
+
         if self._is_hovered:
-            color = color.lighter(110)
+            # Hover effect - slightly lighter and with subtle border
+            color = color.lighter(115) if self.count > 0 else color.lighter(105)
+            pen_color = QColor("#f97316")  # Orange accent on hover
+            pen_width = 2
+        else:
+            if self.count == 0:
+                pen_color = QColor("#e2e8f0")
+            else:
+                # Subtle darker border for colored cells
+                pen_color = color.darker(120) if self.count > 0 else QColor("#e2e8f0")
+            pen_width = 1
 
         painter.setBrush(color)
-        painter.setPen(QPen(QColor("#e2e8f0"), 1))
-        painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 3, 3)
+        painter.setPen(QPen(pen_color, pen_width))
+
+        # More rounded corners for smoother look
+        painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 5, 5)
 
         painter.end()
 
@@ -95,15 +110,15 @@ class HeatmapCalendar(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Setup the UI"""
+        """Setup the UI with better spacing"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
         # Header with month labels
         self.header = QWidget()
         self.header_layout = QHBoxLayout(self.header)
-        self.header_layout.setContentsMargins(30, 0, 0, 0)
+        self.header_layout.setContentsMargins(34, 0, 0, 8)
         self.header_layout.setSpacing(0)
         self._update_month_labels()
         layout.addWidget(self.header)
@@ -117,7 +132,7 @@ class HeatmapCalendar(QWidget):
 
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout(self.grid_widget)
-        self.grid_layout.setSpacing(2)
+        self.grid_layout.setSpacing(4)
         self.grid_layout.setContentsMargins(0, 0, 0, 0)
 
         self.cells: List[HeatmapCell] = []
@@ -129,41 +144,56 @@ class HeatmapCalendar(QWidget):
         # Legend
         legend_layout = QHBoxLayout()
         legend_layout.addStretch()
-        legend_layout.addWidget(QLabel("少"))
+
+        less_label = QLabel("少")
+        less_label.setStyleSheet("color: #64748b; font-size: 13px; font-weight: 500;")
+        legend_layout.addWidget(less_label)
+        legend_layout.addSpacing(12)
 
         for count in [0, 1, 2, 3, 4]:
             legend_cell = QLabel()
-            legend_cell.setFixedSize(16, 16)
+            legend_cell.setFixedSize(18, 18)
             legend_cell.setStyleSheet(self._get_legend_style(count))
             legend_layout.addWidget(legend_cell)
+            if count < 4:
+                legend_layout.addSpacing(6)
 
-        legend_layout.addWidget(QLabel("多"))
+        legend_layout.addSpacing(12)
+        more_label = QLabel("多")
+        more_label.setStyleSheet("color: #64748b; font-size: 13px; font-weight: 500;")
+        legend_layout.addWidget(more_label)
+
         legend_layout.addStretch()
         layout.addLayout(legend_layout)
 
         # Summary label
         self.summary_label = QLabel()
         self.summary_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.summary_label.setStyleSheet("color: #64748b; font-size: 14px;")
+        self.summary_label.setStyleSheet("color: #64748b; font-size: 13px; padding: 12px; background-color: #ffffff; border-radius: 10px; border: 1px solid #e2e8f0;")
         layout.addWidget(self.summary_label)
 
     def _get_legend_style(self, count: int) -> str:
-        """Get legend cell style"""
+        """Get legend cell style - tomato red theme"""
         if count == 0:
-            color = "#f1f5f9"
+            color = "#f8fafc"
+            border_color = "#e2e8f0"
         elif count == 1:
-            color = "#dbeafe"
+            color = "#fef2f2"
+            border_color = "#fecaca"
         elif count == 2:
-            color = "#93c5fd"
+            color = "#fecaca"
+            border_color = "#f87171"
         elif count == 3:
-            color = "#3b82f6"
+            color = "#f87171"
+            border_color = "#dc2626"
         else:
-            color = "#1d4ed8"
+            color = "#991b1b"
+            border_color = "#7f1d1d"
         return f"""
             QLabel {{
                 background-color: {color};
-                border-radius: 3px;
-                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                border: 2px solid {border_color};
             }}
         """
 
@@ -197,8 +227,8 @@ class HeatmapCalendar(QWidget):
                 current_month = date.month()
                 current_year = date.year()
                 month_label = QLabel(date.toString("MMM"))
-                month_label.setStyleSheet("color: #64748b; font-size: 11px;")
-                month_label.setFixedWidth(154)  # 7 days * 22px
+                month_label.setStyleSheet("color: #64748b; font-size: 12px; font-weight: 500;")
+                month_label.setFixedWidth(182)  # 7 days * 26px
                 self.header_layout.addWidget(month_label)
 
             date = date.addDays(28)  # roughly a month
@@ -221,9 +251,9 @@ class HeatmapCalendar(QWidget):
         for row in range(7):
             if day_labels[row]:
                 label = QLabel(day_labels[row])
-                label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+                label.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 500;")
                 label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                label.setFixedWidth(24)
+                label.setFixedWidth(28)
                 self.grid_layout.addWidget(label, row, 0)
 
         # Populate cells
