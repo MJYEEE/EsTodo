@@ -154,6 +154,10 @@ class MainWindow(QMainWindow):
         self.todo_tree.add_child_button.clicked.connect(self._on_new_child_todo)
         self.todo_tree.delete_button.clicked.connect(self._on_delete_todo)
         self.todo_tree.start_pomodoro_for_todo.connect(self._start_pomodoro_for_todo)
+        self.todo_tree.new_todo_requested.connect(self._on_new_todo)
+        self.todo_tree.new_child_todo_requested.connect(self._on_new_child_todo_from_menu)
+        self.todo_tree.todo_toggle_completed.connect(self._on_toggle_todo_completed)
+        self.todo_tree.todo_delete_requested.connect(self._on_delete_todo_from_menu)
         splitter.addWidget(self.todo_tree)
 
         self.todo_editor = TodoEditor(self.tag_model)
@@ -404,6 +408,33 @@ class MainWindow(QMainWindow):
         self.current_todo = None
         self.todo_editor.clear()
         self.todo_editor.setVisible(False)
+
+    def _on_new_child_todo_from_menu(self, parent_todo: Todo):
+        """Create a new child todo from context menu"""
+        self.current_todo = parent_todo
+        new_todo = Todo(parent_id=parent_todo.id)
+        self.todo_editor.set_todo(new_todo)
+        self.todo_editor.setVisible(True)
+        self.todo_editor.title_input.setFocus()
+
+    def _on_toggle_todo_completed(self, todo: Todo):
+        """Toggle todo completion status"""
+        todo.is_completed = not todo.is_completed
+        if todo.id:
+            self.todo_model.update(todo)
+        self._load_todos()
+
+    def _on_delete_todo_from_menu(self, todo: Todo):
+        """Delete todo from context menu"""
+        if not todo or not todo.id:
+            return
+
+        self.todo_model.delete(todo.id)
+        if self.current_todo and self.current_todo.id == todo.id:
+            self.current_todo = None
+            self.todo_editor.clear()
+            self.todo_editor.setVisible(False)
+        self._load_todos()
 
     def _toggle_pomodoro_window(self):
         """Toggle pomodoro timer page"""

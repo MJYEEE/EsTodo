@@ -137,23 +137,6 @@ QTreeWidget::item:selected {{
     color: {colors["accent"]};
 }}
 
-QTreeWidget::branch {{
-    background-color: transparent;
-    width: 24px;
-}}
-
-QTreeWidget::branch:has-children:!has-siblings:closed,
-QTreeWidget::branch:closed:has-children:has-siblings {{
-    border-image: none;
-    image: none;
-}}
-
-QTreeWidget::branch:open:has-children:!has-siblings,
-QTreeWidget::branch:open:has-children:has-siblings {{
-    border-image: none;
-    image: none;
-}}
-
 /* Buttons - Windows 11 style */
 QPushButton {{
     padding: 10px 20px;

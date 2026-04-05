@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QSize
 from PyQt6.QtGui import QDrag, QIcon, QColor, QFont
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Set
 from ..models.todo import Todo
 
 
@@ -54,10 +54,16 @@ class TodoTreeWidget(QWidget):
     todo_selected = pyqtSignal(object)  # Emits Todo or None
     todo_double_clicked = pyqtSignal(object)  # Emits Todo
     start_pomodoro_for_todo = pyqtSignal(object)  # Emits Todo
+    new_todo_requested = pyqtSignal()  # Request new todo
+    new_child_todo_requested = pyqtSignal(object)  # Request new child todo for parent
+    todo_toggle_completed = pyqtSignal(object)  # Toggle todo completion
+    todo_delete_requested = pyqtSignal(object)  # Request todo deletion
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.todos: List[Todo] = []
+        self._expanded_ids: Set[int] = set()  # Store expanded todo IDs
+        self._selected_todo_id: Optional[int] = None  # Store selected todo ID
         self._setup_ui()
 
     def _setup_ui(self):
@@ -110,6 +116,7 @@ class TodoTreeWidget(QWidget):
         self.tree.setIndentation(28)
         self.tree.setUniformRowHeights(True)  # Performance optimization
         self.tree.setWordWrap(False)
+        self.tree.setRootIsDecorated(True)  # Enable native branch indicators
 
         # Smooth scrolling optimization
         self.tree.setVerticalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
@@ -119,11 +126,14 @@ class TodoTreeWidget(QWidget):
         self.tree.itemSelectionChanged.connect(self._on_selection_changed)
         self.tree.itemDoubleClicked.connect(self._on_double_clicked)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
+        self.tree.itemExpanded.connect(self._on_item_expanded)
+        self.tree.itemCollapsed.connect(self._on_item_collapsed)
 
         layout.addWidget(self.tree, 1)
 
     def set_todos(self, todos: List[Todo]):
         """Set the todos to display"""
+        self._save_state()  # Save current state before refreshing
         self.todos = todos
         self._refresh_tree()
 
@@ -142,6 +152,48 @@ class TodoTreeWidget(QWidget):
         """Collapse all items"""
         self.tree.collapseAll()
 
+    def _save_state(self):
+        """Save current expansion and selection state"""
+        self._expanded_ids.clear()
+        self._selected_todo_id = None
+
+        # Save expanded items
+        def save_expanded(item):
+            if isinstance(item, TodoTreeItem) and item.isExpanded() and item.todo.id:
+                self._expanded_ids.add(item.todo.id)
+            for i in range(item.childCount()):
+                save_expanded(item.child(i))
+
+        for i in range(self.tree.topLevelItemCount()):
+            save_expanded(self.tree.topLevelItem(i))
+
+        # Save selected item
+        selected = self.get_selected_todo()
+        if selected and selected.id:
+            self._selected_todo_id = selected.id
+
+    def _restore_state(self):
+        """Restore expansion and selection state"""
+        item_to_select = None
+
+        # Restore expanded items and find item to select
+        def restore_item(item):
+            nonlocal item_to_select
+            if isinstance(item, TodoTreeItem):
+                if item.todo.id in self._expanded_ids:
+                    item.setExpanded(True)
+                if item.todo.id == self._selected_todo_id:
+                    item_to_select = item
+            for i in range(item.childCount()):
+                restore_item(item.child(i))
+
+        for i in range(self.tree.topLevelItemCount()):
+            restore_item(self.tree.topLevelItem(i))
+
+        # Restore selection
+        if item_to_select:
+            self.tree.setCurrentItem(item_to_select)
+
     def _refresh_tree(self):
         """Refresh the tree display - optimized for performance"""
         # Disable updates during refresh for smoother performance
@@ -153,8 +205,21 @@ class TodoTreeWidget(QWidget):
                 item = self._create_tree_item(todo)
                 self.tree.addTopLevelItem(item)
                 self._add_children(item, todo.children)
+
+            # Restore previous state
+            self._restore_state()
         finally:
             self.tree.setUpdatesEnabled(True)
+
+    def _on_item_expanded(self, item):
+        """Handle item expanded - save to state"""
+        if isinstance(item, TodoTreeItem) and item.todo.id:
+            self._expanded_ids.add(item.todo.id)
+
+    def _on_item_collapsed(self, item):
+        """Handle item collapsed - remove from state"""
+        if isinstance(item, TodoTreeItem) and item.todo.id:
+            self._expanded_ids.discard(item.todo.id)
 
     def _create_tree_item(self, todo: Todo) -> TodoTreeItem:
         """Create a tree item for a todo"""
@@ -182,6 +247,9 @@ class TodoTreeWidget(QWidget):
         item = self.tree.itemAt(position)
         if not item:
             return
+
+        # Select the item under cursor
+        self.tree.setCurrentItem(item)
 
         menu = QMenu(self)
 
@@ -213,18 +281,14 @@ class TodoTreeWidget(QWidget):
         action = menu.exec(self.tree.viewport().mapToGlobal(position))
 
         if action == add_action:
-            # TODO: Emit signal
-            pass
+            self.new_todo_requested.emit()
         elif action == add_child_action:
-            # TODO: Emit signal
-            pass
+            self.new_child_todo_requested.emit(item.todo)
         elif action == pomodoro_action:
             self.start_pomodoro_for_todo.emit(item.todo)
         elif action == edit_action:
             self.todo_double_clicked.emit(item.todo)
         elif action == toggle_action:
-            # TODO: Emit signal
-            pass
+            self.todo_toggle_completed.emit(item.todo)
         elif action == delete_action:
-            # TODO: Emit signal
-            pass
+            self.todo_delete_requested.emit(item.todo)
