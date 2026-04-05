@@ -10,8 +10,8 @@ from typing import Optional
 from ..models.pomodoro import Pomodoro
 
 
-class PomodoroTimerWindow(QWidget):
-    """Pomodoro timer window - floating, always on top"""
+class PomodoroTimerWidget(QWidget):
+    """Pomodoro timer widget - integrated into main window"""
 
     timer_started = pyqtSignal(object)  # Emits Pomodoro
     timer_paused = pyqtSignal(object)  # Emits Pomodoro
@@ -27,19 +27,66 @@ class PomodoroTimerWindow(QWidget):
         self.is_paused: bool = False
         self.current_todo_id: Optional[int] = None
         self.current_todo_title: str = ""
+        self.is_dark_mode: bool = False
 
         self._setup_ui()
         self._connect_signals()
 
+    def set_dark_mode(self, is_dark: bool):
+        """Set dark mode for the widget"""
+        self.is_dark_mode = is_dark
+        self._update_colors()
+
+    def _update_colors(self):
+        """Update colors based on theme"""
+        if self.is_dark_mode:
+            timer_bg = "#1e293b"
+            todo_bg = "#334155"
+            todo_color = "#94a3b8"
+            time_color = "#f1f5f9"
+            status_color = "#94a3b8"
+            progress_bg = "#334155"
+            progress_chunk = "#4f46e5"
+        else:
+            timer_bg = "#f8fafc"
+            todo_bg = "#f1f5f9"
+            todo_color = "#64748b"
+            time_color = "#1e293b"
+            status_color = "#64748b"
+            progress_bg = "#e2e8f0"
+            progress_chunk = "#4f46e5"
+
+        self.timer_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {timer_bg};
+                border-radius: 16px;
+            }}
+        """)
+        self.todo_label.setStyleSheet(f"""
+            color: {todo_color};
+            font-size: 12px;
+            padding: 8px;
+            background-color: {todo_bg};
+            border-radius: 6px;
+        """)
+        self.time_label.setStyleSheet(f"color: {time_color};")
+        self.status_label.setStyleSheet(f"color: {status_color}; font-size: 14px;")
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                background-color: {progress_bg};
+                height: 8px;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {progress_chunk};
+                border-radius: 4px;
+            }}
+        """)
+
     def _setup_ui(self):
         """Setup the UI"""
-        self.setWindowTitle("番茄钟")
-        self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
-        )
-        self.setMinimumSize(320, 400)
-        self.setMaximumSize(400, 500)
+        self.setMinimumSize(400, 500)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
@@ -67,15 +114,27 @@ class PomodoroTimerWindow(QWidget):
 
         layout.addLayout(mode_layout)
 
-        # Custom duration
+        # Custom duration - hours, minutes, seconds
         custom_layout = QHBoxLayout()
         custom_layout.addWidget(QLabel("自定义时长:"))
 
-        self.duration_spin = QSpinBox()
-        self.duration_spin.setRange(1, 120)
-        self.duration_spin.setValue(25)
-        self.duration_spin.setSuffix(" 分钟")
-        custom_layout.addWidget(self.duration_spin)
+        self.hour_spin = QSpinBox()
+        self.hour_spin.setRange(0, 23)
+        self.hour_spin.setValue(0)
+        self.hour_spin.setSuffix(" 时")
+        custom_layout.addWidget(self.hour_spin)
+
+        self.minute_spin = QSpinBox()
+        self.minute_spin.setRange(0, 59)
+        self.minute_spin.setValue(25)
+        self.minute_spin.setSuffix(" 分")
+        custom_layout.addWidget(self.minute_spin)
+
+        self.second_spin = QSpinBox()
+        self.second_spin.setRange(0, 59)
+        self.second_spin.setValue(0)
+        self.second_spin.setSuffix(" 秒")
+        custom_layout.addWidget(self.second_spin)
 
         layout.addLayout(custom_layout)
 
@@ -93,14 +152,8 @@ class PomodoroTimerWindow(QWidget):
         layout.addWidget(self.todo_label)
 
         # Timer display
-        timer_container = QFrame()
-        timer_container.setStyleSheet("""
-            QFrame {
-                background-color: #f8fafc;
-                border-radius: 16px;
-            }
-        """)
-        timer_layout = QVBoxLayout(timer_container)
+        self.timer_container = QFrame()
+        timer_layout = QVBoxLayout(self.timer_container)
         timer_layout.setContentsMargins(24, 32, 24, 32)
 
         self.time_label = QLabel("25:00")
@@ -136,7 +189,7 @@ class PomodoroTimerWindow(QWidget):
         """)
         timer_layout.addWidget(self.progress_bar)
 
-        layout.addWidget(timer_container, 1)
+        layout.addWidget(self.timer_container, 1)
 
         # Control buttons
         control_layout = QHBoxLayout()
@@ -170,6 +223,9 @@ class PomodoroTimerWindow(QWidget):
         count_layout.addStretch()
         layout.addLayout(count_layout)
 
+        # Initialize colors
+        self._update_colors()
+
     def _connect_signals(self):
         """Connect signals"""
         # Mode buttons
@@ -177,8 +233,10 @@ class PomodoroTimerWindow(QWidget):
         self.short_break_btn.clicked.connect(lambda: self._set_mode("short_break"))
         self.long_break_btn.clicked.connect(lambda: self._set_mode("long_break"))
 
-        # Duration spin
-        self.duration_spin.valueChanged.connect(self._on_duration_changed)
+        # Duration spins
+        self.hour_spin.valueChanged.connect(self._on_duration_changed)
+        self.minute_spin.valueChanged.connect(self._on_duration_changed)
+        self.second_spin.valueChanged.connect(self._on_duration_changed)
 
         # Control buttons
         self.start_btn.clicked.connect(self._on_start)
@@ -196,16 +254,25 @@ class PomodoroTimerWindow(QWidget):
 
         # Set duration
         if mode == "work":
-            self.duration_spin.setValue(25)
+            self.hour_spin.setValue(0)
+            self.minute_spin.setValue(25)
+            self.second_spin.setValue(0)
         elif mode == "short_break":
-            self.duration_spin.setValue(5)
+            self.hour_spin.setValue(0)
+            self.minute_spin.setValue(5)
+            self.second_spin.setValue(0)
         elif mode == "long_break":
-            self.duration_spin.setValue(15)
+            self.hour_spin.setValue(0)
+            self.minute_spin.setValue(15)
+            self.second_spin.setValue(0)
 
-    def _on_duration_changed(self, value: int):
+    def _on_duration_changed(self):
         """Handle duration change"""
         if not self.timer.isActive() and not self.is_paused:
-            self.time_remaining = value * 60
+            hours = self.hour_spin.value()
+            minutes = self.minute_spin.value()
+            seconds = self.second_spin.value()
+            self.time_remaining = hours * 3600 + minutes * 60 + seconds
             self._update_time_display()
 
     def link_to_todo(self, todo_id: Optional[int], todo_title: str = ""):
@@ -214,22 +281,27 @@ class PomodoroTimerWindow(QWidget):
         self.current_todo_title = todo_title
 
         if todo_id and todo_title:
-            self.todo_label.setText(f"📋 {todo_title}")
+            self.todo_label.setText(f"关联: {todo_title}")
             self.todo_label.show()
         else:
             self.todo_label.hide()
 
     def _on_start(self):
         """Handle start button"""
-        duration = self.duration_spin.value()
-        self.time_remaining = duration * 60
+        hours = self.hour_spin.value()
+        minutes = self.minute_spin.value()
+        seconds = self.second_spin.value()
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        total_minutes = total_seconds / 60  # Store as minutes for database
+
+        self.time_remaining = total_seconds
         self.is_paused = False
 
         # Create pomodoro record
         from datetime import datetime
         self.current_pomodoro = Pomodoro(
             todo_id=self.current_todo_id,
-            duration=duration,
+            duration=total_minutes,
             start_time=datetime.now()
         )
 
@@ -297,13 +369,21 @@ class PomodoroTimerWindow(QWidget):
 
     def _update_time_display(self):
         """Update the time display"""
-        minutes = self.time_remaining // 60
-        seconds = self.time_remaining % 60
-        self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
+        hours = self.time_remaining // 3600
+        remaining = self.time_remaining % 3600
+        minutes = remaining // 60
+        seconds = remaining % 60
+        if hours > 0:
+            self.time_label.setText(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+        else:
+            self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
 
     def _update_progress(self):
         """Update the progress bar"""
-        total = self.duration_spin.value() * 60
+        hours = self.hour_spin.value()
+        minutes = self.minute_spin.value()
+        seconds = self.second_spin.value()
+        total = hours * 3600 + minutes * 60 + seconds
         if total > 0:
             elapsed = total - self.time_remaining
             progress = int((elapsed / total) * 100)
@@ -318,7 +398,9 @@ class PomodoroTimerWindow(QWidget):
         self.work_mode_btn.setEnabled(False)
         self.short_break_btn.setEnabled(False)
         self.long_break_btn.setEnabled(False)
-        self.duration_spin.setEnabled(False)
+        self.hour_spin.setEnabled(False)
+        self.minute_spin.setEnabled(False)
+        self.second_spin.setEnabled(False)
 
     def _update_ui_stopped(self):
         """Update UI for stopped state"""
@@ -328,12 +410,16 @@ class PomodoroTimerWindow(QWidget):
         self.work_mode_btn.setEnabled(True)
         self.short_break_btn.setEnabled(True)
         self.long_break_btn.setEnabled(True)
-        self.duration_spin.setEnabled(True)
+        self.hour_spin.setEnabled(True)
+        self.minute_spin.setEnabled(True)
+        self.second_spin.setEnabled(True)
         self.progress_bar.setValue(0)
 
         # Reset time display
-        duration = self.duration_spin.value()
-        self.time_remaining = duration * 60
+        hours = self.hour_spin.value()
+        minutes = self.minute_spin.value()
+        seconds = self.second_spin.value()
+        self.time_remaining = hours * 3600 + minutes * 60 + seconds
         self._update_time_display()
 
     def update_today_count(self, count: int):

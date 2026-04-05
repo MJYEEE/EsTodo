@@ -2,7 +2,8 @@
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QStackedWidget, QSplitter, QFrame
+    QPushButton, QLabel, QStackedWidget, QSplitter, QFrame,
+    QMessageBox
 )
 from PyQt6.QtCore import Qt, QSize, QDate
 from PyQt6.QtGui import QAction, QIcon
@@ -12,7 +13,7 @@ from datetime import datetime, timedelta
 from .theme import Theme, get_stylesheet
 from .todo_tree import TodoTreeWidget
 from .todo_editor import TodoEditor
-from .pomodoro_timer import PomodoroTimerWindow
+from .pomodoro_timer import PomodoroTimerWidget
 from .notifications import notify
 from ..database import Database
 from ..models.todo import TodoModel, Todo
@@ -29,7 +30,7 @@ class MainWindow(QMainWindow):
         self.pomodoro_model = PomodoroModel(db)
         self.current_todo: Optional[Todo] = None
         self.current_theme = Theme.LIGHT
-        self.pomodoro_window: Optional[PomodoroTimerWindow] = None
+        self.pomodoro_widget: Optional[PomodoroTimerWidget] = None
 
         self._setup_ui()
         self._load_todos()
@@ -74,22 +75,28 @@ class MainWindow(QMainWindow):
         self.nav_todos.clicked.connect(lambda: self._switch_page(0))
         sidebar_layout.addWidget(self.nav_todos)
 
+        self.nav_pomodoro = QPushButton("番茄钟")
+        self.nav_pomodoro.setObjectName("navButton")
+        self.nav_pomodoro.setCheckable(True)
+        self.nav_pomodoro.clicked.connect(lambda: self._switch_page(1))
+        sidebar_layout.addWidget(self.nav_pomodoro)
+
         self.nav_calendar = QPushButton("番茄日历")
         self.nav_calendar.setObjectName("navButton")
         self.nav_calendar.setCheckable(True)
-        self.nav_calendar.clicked.connect(lambda: self._switch_page(1))
+        self.nav_calendar.clicked.connect(lambda: self._switch_page(2))
         sidebar_layout.addWidget(self.nav_calendar)
 
         self.nav_stats = QPushButton("统计")
         self.nav_stats.setObjectName("navButton")
         self.nav_stats.setCheckable(True)
-        self.nav_stats.clicked.connect(lambda: self._switch_page(2))
+        self.nav_stats.clicked.connect(lambda: self._switch_page(3))
         sidebar_layout.addWidget(self.nav_stats)
 
         self.nav_settings = QPushButton("设置")
         self.nav_settings.setObjectName("navButton")
         self.nav_settings.setCheckable(True)
-        self.nav_settings.clicked.connect(lambda: self._switch_page(3))
+        self.nav_settings.clicked.connect(lambda: self._switch_page(4))
         sidebar_layout.addWidget(self.nav_settings)
 
         sidebar_layout.addStretch()
@@ -139,7 +146,30 @@ class MainWindow(QMainWindow):
 
         self.page_stack.addWidget(todo_page)
 
-        # Page 1: Calendar (placeholder)
+        # Page 1: Pomodoro Timer
+        pomodoro_page = QWidget()
+        pomodoro_layout = QVBoxLayout(pomodoro_page)
+        pomodoro_layout.setContentsMargins(32, 32, 32, 32)
+
+        # Create pomodoro widget
+        self.pomodoro_widget = PomodoroTimerWidget()
+        self.pomodoro_widget.timer_started.connect(self._on_pomodoro_started)
+        self.pomodoro_widget.timer_paused.connect(self._on_pomodoro_paused)
+        self.pomodoro_widget.timer_resumed.connect(self._on_pomodoro_resumed)
+        self.pomodoro_widget.timer_stopped.connect(self._on_pomodoro_stopped)
+        self.pomodoro_widget.timer_completed.connect(self._on_pomodoro_completed)
+
+        # Center the pomodoro widget
+        pomodoro_layout.addStretch()
+        pomodoro_layout.addWidget(self.pomodoro_widget, 0, Qt.AlignmentFlag.AlignCenter)
+        pomodoro_layout.addStretch()
+
+        self.page_stack.addWidget(pomodoro_page)
+
+        # Update initial count
+        self._update_pomodoro_count()
+
+        # Page 2: Calendar (placeholder)
         calendar_page = QWidget()
         calendar_layout = QVBoxLayout(calendar_page)
         calendar_label = QLabel("番茄日历 - 即将推出")
@@ -148,7 +178,7 @@ class MainWindow(QMainWindow):
         calendar_layout.addWidget(calendar_label)
         self.page_stack.addWidget(calendar_page)
 
-        # Page 2: Stats (placeholder)
+        # Page 3: Stats (placeholder)
         stats_page = QWidget()
         stats_layout = QVBoxLayout(stats_page)
         stats_label = QLabel("统计 - 即将推出")
@@ -157,7 +187,7 @@ class MainWindow(QMainWindow):
         stats_layout.addWidget(stats_label)
         self.page_stack.addWidget(stats_page)
 
-        # Page 3: Settings (placeholder)
+        # Page 4: Settings (placeholder)
         settings_page = QWidget()
         settings_layout = QVBoxLayout(settings_page)
         settings_label = QLabel("设置 - 即将推出")
@@ -232,7 +262,7 @@ class MainWindow(QMainWindow):
         self.page_stack.setCurrentIndex(index)
 
         # Update nav buttons
-        for i, btn in enumerate([self.nav_todos, self.nav_calendar, self.nav_stats, self.nav_settings]):
+        for i, btn in enumerate([self.nav_todos, self.nav_pomodoro, self.nav_calendar, self.nav_stats, self.nav_settings]):
             btn.setChecked(i == index)
 
     def _toggle_theme(self):
@@ -240,9 +270,13 @@ class MainWindow(QMainWindow):
         if self.current_theme == Theme.LIGHT:
             self.current_theme = Theme.DARK
             self.theme_button.setText("浅色")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(True)
         else:
             self.current_theme = Theme.LIGHT
             self.theme_button.setText("深色")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(False)
         self._apply_theme()
 
     def _apply_theme(self):
@@ -320,36 +354,14 @@ class MainWindow(QMainWindow):
         self.todo_editor.setVisible(False)
 
     def _toggle_pomodoro_window(self):
-        """Toggle pomodoro timer window"""
-        if self.pomodoro_window is None:
-            self._create_pomodoro_window()
-
-        if self.pomodoro_window.isVisible():
-            self.pomodoro_window.hide()
-        else:
-            self.pomodoro_window.show()
-            self.pomodoro_window.raise_()
-            self.pomodoro_window.activateWindow()
-
-    def _create_pomodoro_window(self):
-        """Create the pomodoro timer window"""
-        self.pomodoro_window = PomodoroTimerWindow()
-        self.pomodoro_window.timer_started.connect(self._on_pomodoro_started)
-        self.pomodoro_window.timer_paused.connect(self._on_pomodoro_paused)
-        self.pomodoro_window.timer_resumed.connect(self._on_pomodoro_resumed)
-        self.pomodoro_window.timer_stopped.connect(self._on_pomodoro_stopped)
-        self.pomodoro_window.timer_completed.connect(self._on_pomodoro_completed)
-        self._update_pomodoro_count()
+        """Toggle pomodoro timer page"""
+        self._switch_page(1)
 
     def _start_pomodoro_for_todo(self, todo: Todo):
         """Start pomodoro timer linked to a todo"""
-        if self.pomodoro_window is None:
-            self._create_pomodoro_window()
-
-        self.pomodoro_window.link_to_todo(todo.id, todo.title)
-        self.pomodoro_window.show()
-        self.pomodoro_window.raise_()
-        self.pomodoro_window.activateWindow()
+        if self.pomodoro_widget:
+            self.pomodoro_widget.link_to_todo(todo.id, todo.title)
+            self._switch_page(1)
 
     def _on_pomodoro_started(self, pomodoro: Pomodoro):
         """Handle pomodoro started"""
@@ -377,15 +389,30 @@ class MainWindow(QMainWindow):
         # Show notification
         notify("番茄钟完成！", "休息一下吧，你做得很棒！")
 
+        # Show in-app message box - always on top
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setWindowTitle("番茄钟完成！")
+        msg_box.setText("恭喜！番茄钟完成啦！")
+        msg_box.setInformativeText("休息一下吧，你做得很棒！")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        # Set window flags to stay on top
+        msg_box.setWindowFlags(
+            msg_box.windowFlags() |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Dialog
+        )
+        msg_box.exec()
+
         # Update count
         self._update_pomodoro_count()
 
     def _update_pomodoro_count(self):
         """Update today's pomodoro count"""
-        if self.pomodoro_window:
+        if self.pomodoro_widget:
             today = datetime.now().date()
             start = datetime.combine(today, datetime.min.time())
             end = start + timedelta(days=1)
             pomodoros = self.pomodoro_model.get_by_date_range(start, end)
             completed = [p for p in pomodoros if p.is_completed]
-            self.pomodoro_window.update_today_count(len(completed))
+            self.pomodoro_widget.update_today_count(len(completed))

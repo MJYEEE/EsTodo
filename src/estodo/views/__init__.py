@@ -3,6 +3,6 @@
 from .main_window import MainWindow
 from .todo_tree import TodoTreeWidget
 from .todo_editor import TodoEditor
-from .pomodoro_timer import PomodoroTimerWindow
+from .pomodoro_timer import PomodoroTimerWidget
 
-__all__ = ["MainWindow", "TodoTreeWidget", "TodoEditor", "PomodoroTimerWindow"]
+__all__ = ["MainWindow", "TodoTreeWidget", "TodoEditor", "PomodoroTimerWidget"]
