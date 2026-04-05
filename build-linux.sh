@@ -40,13 +40,26 @@ rm -rf build dist
 echo ""
 echo "Building with PyInstaller..."
 
-pyinstaller \
-    --name "EsTodo" \
-    --windowed \
-    --onefile \
-    --clean \
-    --add-data "src/estodo:estodo" \
-    src/estodo/main.py
+if [ -f "assets/icon.ico" ]; then
+    echo "✓ Using icon: assets/icon.ico"
+    pyinstaller \
+        --name "EsTodo" \
+        --windowed \
+        --onefile \
+        --clean \
+        --icon "assets/icon.ico" \
+        --add-data "src/estodo:estodo" \
+        src/estodo/main.py
+else
+    echo "⚠ Icon not found at assets/icon.ico, building without icon"
+    pyinstaller \
+        --name "EsTodo" \
+        --windowed \
+        --onefile \
+        --clean \
+        --add-data "src/estodo:estodo" \
+        src/estodo/main.py
+fi
 
 echo ""
 echo "✓ Build successful!"

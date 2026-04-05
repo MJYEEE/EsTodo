@@ -43,13 +43,27 @@ Write-Host ""
 Write-Host "Building with PyInstaller..." -ForegroundColor Cyan
 
 # Simple one-file build
-pyinstaller `
-    --name "EsTodo" `
-    --windowed `
-    --onefile `
-    --clean `
-    --add-data "src/estodo;estodo" `
-    src/estodo/main.py
+$iconPath = "assets/icon.ico"
+if (Test-Path $iconPath) {
+    Write-Host "✓ Using icon: $iconPath" -ForegroundColor Green
+    pyinstaller `
+        --name "EsTodo" `
+        --windowed `
+        --onefile `
+        --clean `
+        --icon $iconPath `
+        --add-data "src/estodo;estodo" `
+        src/estodo/main.py
+} else {
+    Write-Host "⚠ Icon not found at $iconPath, building without icon" -ForegroundColor Yellow
+    pyinstaller `
+        --name "EsTodo" `
+        --windowed `
+        --onefile `
+        --clean `
+        --add-data "src/estodo;estodo" `
+        src/estodo/main.py
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
