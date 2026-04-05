@@ -14,6 +14,8 @@ from .theme import Theme, get_stylesheet
 from .todo_tree import TodoTreeWidget
 from .todo_editor import TodoEditor
 from .pomodoro_timer import PomodoroTimerWidget
+from .heatmap import HeatmapCalendar
+from .day_detail_dialog import DayDetailDialog
 from .notifications import notify
 from ..database import Database
 from ..models.todo import TodoModel, Todo
@@ -169,14 +171,25 @@ class MainWindow(QMainWindow):
         # Update initial count
         self._update_pomodoro_count()
 
-        # Page 2: Calendar (placeholder)
+        # Page 2: Calendar heatmap
         calendar_page = QWidget()
         calendar_layout = QVBoxLayout(calendar_page)
-        calendar_label = QLabel("番茄日历 - 即将推出")
-        calendar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        calendar_label.setStyleSheet("font-size: 18px; color: #64748b;")
-        calendar_layout.addWidget(calendar_label)
+        calendar_layout.setContentsMargins(16, 16, 16, 16)
+
+        # Header
+        calendar_header = QLabel("🍅 番茄日历")
+        calendar_header.setObjectName("headerLabel")
+        calendar_layout.addWidget(calendar_header)
+
+        # Create heatmap
+        self.heatmap = HeatmapCalendar()
+        self.heatmap.date_clicked.connect(self._on_date_clicked)
+        calendar_layout.addWidget(self.heatmap, 1)
+
         self.page_stack.addWidget(calendar_page)
+
+        # Load initial heatmap data
+        self._update_heatmap()
 
         # Page 3: Stats (placeholder)
         stats_page = QWidget()
@@ -416,3 +429,17 @@ class MainWindow(QMainWindow):
             pomodoros = self.pomodoro_model.get_by_date_range(start, end)
             completed = [p for p in pomodoros if p.is_completed]
             self.pomodoro_widget.update_today_count(len(completed))
+
+        # Also update heatmap when pomodoro count changes
+        self._update_heatmap()
+
+    def _update_heatmap(self):
+        """Update the heatmap with daily counts"""
+        if hasattr(self, 'heatmap'):
+            daily_counts = self.pomodoro_model.get_daily_counts(365)
+            self.heatmap.set_daily_counts(daily_counts)
+
+    def _on_date_clicked(self, date: QDate):
+        """Handle date click in heatmap"""
+        dialog = DayDetailDialog(date, self.pomodoro_model, self.todo_model, self)
+        dialog.exec()
