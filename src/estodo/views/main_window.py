@@ -13,13 +13,14 @@ from datetime import datetime, timedelta
 from .theme import Theme, get_stylesheet
 from .todo_tree import TodoTreeWidget
 from .todo_editor import TodoEditor
+from .todo_viewer import TodoViewer
 from .pomodoro_timer import PomodoroTimerWidget
 from .heatmap import HeatmapCalendar
 from .day_detail_dialog import DayDetailDialog
 from .tag_dialog import TagManagerDialog
 from .notifications import notify
 from ..database import Database
-from ..models.todo import TodoModel, Todo
+from ..models.todo import TodoModel, Todo, TODO_STATUS_ACTIVE, TODO_STATUS_ARCHIVED
 from ..models.pomodoro import PomodoroModel, Pomodoro
 from ..models.tag import TagModel, Tag
 from ..import_export import ImportExport
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._load_todos()
+        self._load_archived_todos()
         self._apply_theme()
 
     def _setup_ui(self):
@@ -83,28 +85,34 @@ class MainWindow(QMainWindow):
         self.nav_todos.clicked.connect(lambda: self._switch_page(0))
         sidebar_layout.addWidget(self.nav_todos)
 
+        self.nav_archive = QPushButton("📦  归档事项")
+        self.nav_archive.setObjectName("navButton")
+        self.nav_archive.setCheckable(True)
+        self.nav_archive.clicked.connect(lambda: self._switch_page(1))
+        sidebar_layout.addWidget(self.nav_archive)
+
         self.nav_pomodoro = QPushButton("🍅  番茄钟")
         self.nav_pomodoro.setObjectName("navButton")
         self.nav_pomodoro.setCheckable(True)
-        self.nav_pomodoro.clicked.connect(lambda: self._switch_page(1))
+        self.nav_pomodoro.clicked.connect(lambda: self._switch_page(2))
         sidebar_layout.addWidget(self.nav_pomodoro)
 
         self.nav_calendar = QPushButton("📅  番茄日历")
         self.nav_calendar.setObjectName("navButton")
         self.nav_calendar.setCheckable(True)
-        self.nav_calendar.clicked.connect(lambda: self._switch_page(2))
+        self.nav_calendar.clicked.connect(lambda: self._switch_page(3))
         sidebar_layout.addWidget(self.nav_calendar)
 
         self.nav_stats = QPushButton("📊  统计")
         self.nav_stats.setObjectName("navButton")
         self.nav_stats.setCheckable(True)
-        self.nav_stats.clicked.connect(lambda: self._switch_page(3))
+        self.nav_stats.clicked.connect(lambda: self._switch_page(4))
         sidebar_layout.addWidget(self.nav_stats)
 
         self.nav_settings = QPushButton("⚙️  设置")
         self.nav_settings.setObjectName("navButton")
         self.nav_settings.setCheckable(True)
-        self.nav_settings.clicked.connect(lambda: self._switch_page(4))
+        self.nav_settings.clicked.connect(lambda: self._switch_page(5))
         sidebar_layout.addWidget(self.nav_settings)
 
         sidebar_layout.addSpacing(8)
@@ -137,42 +145,13 @@ class MainWindow(QMainWindow):
         self.page_stack = QStackedWidget()
         self.page_stack.setContentsMargins(0, 0, 0, 0)
 
-        # Page 0: Todo list (with editor)
-        todo_page = QWidget()
-        todo_layout = QHBoxLayout(todo_page)
-        todo_layout.setContentsMargins(12, 12, 12, 12)
-        todo_layout.setSpacing(12)
+        # Page 0: Todo list (with viewer and editor)
+        self._setup_todo_page()
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(12)
-        splitter.setChildrenCollapsible(False)
+        # Page 1: Archive list (with viewer)
+        self._setup_archive_page()
 
-        self.todo_tree = TodoTreeWidget()
-        self.todo_tree.todo_selected.connect(self._on_todo_selected)
-        self.todo_tree.todo_double_clicked.connect(self._on_todo_double_clicked)
-        self.todo_tree.add_button.clicked.connect(self._on_new_todo)
-        self.todo_tree.add_child_button.clicked.connect(self._on_new_child_todo)
-        self.todo_tree.delete_button.clicked.connect(self._on_delete_todo)
-        self.todo_tree.start_pomodoro_for_todo.connect(self._start_pomodoro_for_todo)
-        self.todo_tree.new_todo_requested.connect(self._on_new_todo)
-        self.todo_tree.new_child_todo_requested.connect(self._on_new_child_todo_from_menu)
-        self.todo_tree.todo_toggle_completed.connect(self._on_toggle_todo_completed)
-        self.todo_tree.todo_delete_requested.connect(self._on_delete_todo_from_menu)
-        splitter.addWidget(self.todo_tree)
-
-        self.todo_editor = TodoEditor(self.tag_model)
-        self.todo_editor.todo_saved.connect(self._on_todo_saved)
-        self.todo_editor.todo_deleted.connect(self._on_todo_deleted)
-        self.todo_editor.edit_cancelled.connect(self._on_edit_cancelled)
-        self.todo_editor.setVisible(False)
-        splitter.addWidget(self.todo_editor)
-
-        splitter.setSizes([520, 720])
-        todo_layout.addWidget(splitter)
-
-        self.page_stack.addWidget(todo_page)
-
-        # Page 1: Pomodoro Timer - with generous padding
+        # Page 2: Pomodoro Timer - with generous padding
         pomodoro_page = QWidget()
         pomodoro_layout = QVBoxLayout(pomodoro_page)
         pomodoro_layout.setContentsMargins(40, 40, 40, 40)
@@ -195,7 +174,7 @@ class MainWindow(QMainWindow):
         # Update initial count
         self._update_pomodoro_count()
 
-        # Page 2: Calendar heatmap - Windows 11 style
+        # Page 3: Calendar heatmap - Windows 11 style
         calendar_page = QWidget()
         calendar_layout = QVBoxLayout(calendar_page)
         calendar_layout.setContentsMargins(24, 24, 24, 24)
@@ -223,7 +202,7 @@ class MainWindow(QMainWindow):
         # Load initial heatmap data
         self._update_heatmap()
 
-        # Page 3: Stats (placeholder)
+        # Page 4: Stats (placeholder)
         stats_page = QWidget()
         stats_layout = QVBoxLayout(stats_page)
         stats_label = QLabel("统计 - 即将推出")
@@ -232,7 +211,7 @@ class MainWindow(QMainWindow):
         stats_layout.addWidget(stats_label)
         self.page_stack.addWidget(stats_page)
 
-        # Page 4: Settings (placeholder)
+        # Page 5: Settings (placeholder)
         settings_page = QWidget()
         settings_layout = QVBoxLayout(settings_page)
         settings_label = QLabel("设置 - 即将推出")
@@ -246,6 +225,97 @@ class MainWindow(QMainWindow):
 
         # Menu bar
         self._setup_menu_bar()
+
+    def _setup_todo_page(self):
+        """Setup the todo list page"""
+        todo_page = QWidget()
+        todo_layout = QHBoxLayout(todo_page)
+        todo_layout.setContentsMargins(12, 12, 12, 12)
+        todo_layout.setSpacing(12)
+
+        # Use a splitter that allows collapsing
+        self.todo_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.todo_splitter.setHandleWidth(12)
+        self.todo_splitter.setChildrenCollapsible(True)
+
+        self.todo_tree = TodoTreeWidget(mode="active")
+        self.todo_tree.todo_selected.connect(self._on_todo_selected)
+        self.todo_tree.todo_double_clicked.connect(self._on_todo_double_clicked)
+        self.todo_tree.todo_edit_requested.connect(self._on_todo_edit_requested)
+        self.todo_tree.start_pomodoro_for_todo.connect(self._start_pomodoro_for_todo)
+        self.todo_tree.new_todo_requested.connect(self._on_new_todo)
+        self.todo_tree.new_child_todo_requested.connect(self._on_new_child_todo_from_menu)
+        self.todo_tree.todo_toggle_completed.connect(self._on_toggle_todo_completed)
+        self.todo_tree.todo_delete_requested.connect(self._on_delete_todo_from_menu)
+        self.todo_tree.todo_archive_requested.connect(self._on_archive_todo)
+        self.todo_tree.todo_checkbox_clicked.connect(self._on_todo_checkbox_clicked)
+        self.todo_splitter.addWidget(self.todo_tree)
+
+        # Right panel container
+        self.todo_right_container = QWidget()
+        right_layout = QVBoxLayout(self.todo_right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Right panel: stack with viewer and editor
+        self.todo_right_panel = QStackedWidget()
+
+        self.todo_viewer = TodoViewer(self.tag_model)
+        self.todo_viewer.close_requested.connect(self._hide_todo_right_panel)
+        self.todo_right_panel.addWidget(self.todo_viewer)
+
+        self.todo_editor = TodoEditor(self.tag_model)
+        self.todo_editor.todo_saved.connect(self._on_todo_saved)
+        self.todo_editor.todo_deleted.connect(self._on_todo_deleted)
+        self.todo_editor.edit_cancelled.connect(self._on_edit_cancelled)
+        self.todo_right_panel.addWidget(self.todo_editor)
+
+        right_layout.addWidget(self.todo_right_panel)
+        self.todo_splitter.addWidget(self.todo_right_container)
+
+        # Start with right panel hidden
+        self.todo_splitter.setSizes([1000, 0])
+        self.todo_right_container.hide()
+
+        todo_layout.addWidget(self.todo_splitter)
+
+        self.page_stack.addWidget(todo_page)
+
+    def _setup_archive_page(self):
+        """Setup the archive list page"""
+        archive_page = QWidget()
+        archive_layout = QHBoxLayout(archive_page)
+        archive_layout.setContentsMargins(12, 12, 12, 12)
+        archive_layout.setSpacing(12)
+
+        # Use a splitter that allows collapsing
+        self.archive_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.archive_splitter.setHandleWidth(12)
+        self.archive_splitter.setChildrenCollapsible(True)
+
+        self.archive_tree = TodoTreeWidget(mode="archive")
+        self.archive_tree.todo_selected.connect(self._on_archive_todo_selected)
+        self.archive_tree.todo_double_clicked.connect(self._on_archive_todo_double_clicked)
+        self.archive_tree.todo_delete_requested.connect(self._on_delete_archive_todo)
+        self.archive_tree.todo_unarchive_requested.connect(self._on_unarchive_todo)
+        self.archive_splitter.addWidget(self.archive_tree)
+
+        # Right panel container
+        self.archive_right_container = QWidget()
+        right_layout = QVBoxLayout(self.archive_right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.archive_viewer = TodoViewer(self.tag_model)
+        self.archive_viewer.close_requested.connect(self._hide_archive_right_panel)
+        right_layout.addWidget(self.archive_viewer)
+        self.archive_splitter.addWidget(self.archive_right_container)
+
+        # Start with right panel hidden
+        self.archive_splitter.setSizes([1000, 0])
+        self.archive_right_container.hide()
+
+        archive_layout.addWidget(self.archive_splitter)
+
+        self.page_stack.addWidget(archive_page)
 
     def _setup_menu_bar(self):
         """Setup the menu bar"""
@@ -306,15 +376,22 @@ class MainWindow(QMainWindow):
 
     def _load_todos(self):
         """Load todos from database"""
-        todos = self.todo_model.get_root_todos(include_completed=True)
+        todos = self.todo_model.get_root_todos(include_completed=True, status=TODO_STATUS_ACTIVE)
         self.todo_tree.set_todos(todos)
+
+    def _load_archived_todos(self):
+        """Load archived todos from database"""
+        todos = self.todo_model.get_root_todos(include_completed=True, status=TODO_STATUS_ARCHIVED)
+        self.archive_tree.set_todos(todos)
 
     def _switch_page(self, index: int):
         """Switch to a page"""
         self.page_stack.setCurrentIndex(index)
 
         # Update nav buttons
-        for i, btn in enumerate([self.nav_todos, self.nav_pomodoro, self.nav_calendar, self.nav_stats, self.nav_settings]):
+        nav_buttons = [self.nav_todos, self.nav_archive, self.nav_pomodoro,
+                      self.nav_calendar, self.nav_stats, self.nav_settings]
+        for i, btn in enumerate(nav_buttons):
             btn.setChecked(i == index)
 
     def _toggle_theme(self):
@@ -336,13 +413,35 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(get_stylesheet(self.current_theme))
 
     def _on_todo_selected(self, todo: Optional[Todo]):
-        """Handle todo selection"""
+        """Handle todo selection - just select, don't show panel"""
         self.current_todo = todo
 
     def _on_todo_double_clicked(self, todo: Todo):
-        """Handle todo double click - open editor"""
+        """Handle todo double click - show viewer"""
+        self.current_todo = todo
+        self.todo_viewer.set_todo(todo)
+        self.todo_right_panel.setCurrentWidget(self.todo_viewer)
+        self.todo_right_container.show()
+        self.todo_splitter.setSizes([520, 720])
+
+    def _on_todo_edit_requested(self, todo: Todo):
+        """Handle todo edit request from context menu - show editor"""
+        self.current_todo = todo
         self.todo_editor.set_todo(todo)
-        self.todo_editor.setVisible(True)
+        self.todo_right_panel.setCurrentWidget(self.todo_editor)
+        self.todo_right_container.show()
+        self.todo_splitter.setSizes([520, 720])
+
+    def _on_archive_todo_selected(self, todo: Optional[Todo]):
+        """Handle archive todo selection - just select, don't show panel"""
+        self.current_todo = todo
+
+    def _on_archive_todo_double_clicked(self, todo: Todo):
+        """Handle archive todo double click - show viewer"""
+        self.current_todo = todo
+        self.archive_viewer.set_todo(todo)
+        self.archive_right_container.show()
+        self.archive_splitter.setSizes([520, 720])
 
     def _on_new_todo(self):
         """Create a new todo"""
@@ -353,29 +452,70 @@ class MainWindow(QMainWindow):
             new_todo.parent_id = self.current_todo.parent_id
 
         self.todo_editor.set_todo(new_todo)
-        self.todo_editor.setVisible(True)
+        self.todo_right_panel.setCurrentWidget(self.todo_editor)
+        self.todo_right_container.show()
+        self.todo_splitter.setSizes([520, 720])
         self.todo_editor.title_input.setFocus()
 
-    def _on_new_child_todo(self):
-        """Create a new child todo"""
-        if not self.current_todo:
-            return
-
-        new_todo = Todo(parent_id=self.current_todo.id)
+    def _on_new_child_todo_from_menu(self, parent_todo: Todo):
+        """Create a new child todo from context menu"""
+        self.current_todo = parent_todo
+        new_todo = Todo(parent_id=parent_todo.id)
         self.todo_editor.set_todo(new_todo)
-        self.todo_editor.setVisible(True)
+        self.todo_right_panel.setCurrentWidget(self.todo_editor)
+        self.todo_right_container.show()
+        self.todo_splitter.setSizes([520, 720])
         self.todo_editor.title_input.setFocus()
 
-    def _on_delete_todo(self):
-        """Delete the selected todo"""
-        if not self.current_todo or not self.current_todo.id:
+    def _on_toggle_todo_completed(self, todo: Todo):
+        """Toggle todo completion status"""
+        todo.is_completed = not todo.is_completed
+        if todo.id:
+            self.todo_model.update(todo)
+        self._load_todos()
+
+    def _on_todo_checkbox_clicked(self, todo: Todo):
+        """Handle checkbox click - save to database"""
+        if todo.id:
+            self.todo_model.update(todo)
+
+    def _on_archive_todo(self, todo: Todo):
+        """Archive a todo and its children"""
+        if todo.id:
+            self.todo_model.archive(todo.id)
+            self._load_todos()
+            self._load_archived_todos()
+            self._hide_todo_right_panel()
+
+    def _on_unarchive_todo(self, todo: Todo):
+        """Unarchive a todo and its children"""
+        if todo.id:
+            self.todo_model.unarchive(todo.id)
+            self._load_todos()
+            self._load_archived_todos()
+            self._hide_archive_right_panel()
+
+    def _on_delete_todo_from_menu(self, todo: Todo):
+        """Delete todo from context menu"""
+        if not todo or not todo.id:
             return
 
-        self.todo_model.delete(self.current_todo.id)
-        self.current_todo = None
-        self.todo_editor.clear()
-        self.todo_editor.setVisible(False)
+        self.todo_model.delete(todo.id)
+        if self.current_todo and self.current_todo.id == todo.id:
+            self.current_todo = None
+        self._hide_todo_right_panel()
         self._load_todos()
+
+    def _on_delete_archive_todo(self, todo: Todo):
+        """Delete archived todo"""
+        if not todo or not todo.id:
+            return
+
+        self.todo_model.delete(todo.id)
+        if self.current_todo and self.current_todo.id == todo.id:
+            self.current_todo = None
+        self._hide_archive_right_panel()
+        self._load_archived_todos()
 
     def _on_todo_saved(self, todo: Todo):
         """Handle todo saved"""
@@ -390,7 +530,7 @@ class MainWindow(QMainWindow):
 
         self.current_todo = None
         self.todo_editor.clear()
-        self.todo_editor.setVisible(False)
+        self._hide_todo_right_panel()
         self._load_todos()
 
     def _on_todo_deleted(self, todo: Todo):
@@ -400,51 +540,34 @@ class MainWindow(QMainWindow):
 
         self.current_todo = None
         self.todo_editor.clear()
-        self.todo_editor.setVisible(False)
+        self._hide_todo_right_panel()
         self._load_todos()
 
     def _on_edit_cancelled(self):
         """Handle edit cancelled"""
         self.current_todo = None
         self.todo_editor.clear()
-        self.todo_editor.setVisible(False)
+        self._hide_todo_right_panel()
 
-    def _on_new_child_todo_from_menu(self, parent_todo: Todo):
-        """Create a new child todo from context menu"""
-        self.current_todo = parent_todo
-        new_todo = Todo(parent_id=parent_todo.id)
-        self.todo_editor.set_todo(new_todo)
-        self.todo_editor.setVisible(True)
-        self.todo_editor.title_input.setFocus()
+    def _hide_todo_right_panel(self):
+        """Hide the todo right panel"""
+        self.todo_right_container.hide()
+        self.todo_splitter.setSizes([1000, 0])
 
-    def _on_toggle_todo_completed(self, todo: Todo):
-        """Toggle todo completion status"""
-        todo.is_completed = not todo.is_completed
-        if todo.id:
-            self.todo_model.update(todo)
-        self._load_todos()
-
-    def _on_delete_todo_from_menu(self, todo: Todo):
-        """Delete todo from context menu"""
-        if not todo or not todo.id:
-            return
-
-        self.todo_model.delete(todo.id)
-        if self.current_todo and self.current_todo.id == todo.id:
-            self.current_todo = None
-            self.todo_editor.clear()
-            self.todo_editor.setVisible(False)
-        self._load_todos()
+    def _hide_archive_right_panel(self):
+        """Hide the archive right panel"""
+        self.archive_right_container.hide()
+        self.archive_splitter.setSizes([1000, 0])
 
     def _toggle_pomodoro_window(self):
         """Toggle pomodoro timer page"""
-        self._switch_page(1)
+        self._switch_page(2)
 
     def _start_pomodoro_for_todo(self, todo: Todo):
         """Start pomodoro timer linked to a todo"""
         if self.pomodoro_widget:
             self.pomodoro_widget.link_to_todo(todo.id, todo.title)
-            self._switch_page(1)
+            self._switch_page(2)
 
     def _on_pomodoro_started(self, pomodoro: Pomodoro):
         """Handle pomodoro started"""
@@ -522,14 +645,8 @@ class MainWindow(QMainWindow):
 
     def _on_tags_changed(self):
         """Handle tags changed"""
-        # Refresh the todo editor if it's open and has a todo
-        if self.todo_editor.isVisible() and self.todo_editor.todo and self.todo_editor.todo.id:
-            # Reload tags for the current todo
-            self.todo_editor.selected_tag_ids = [
-                t.id for t in self.tag_model.get_by_todo_id(self.todo_editor.todo.id)
-                if t.id
-            ]
-            self.todo_editor._update_tag_display()
+        # Refresh viewers if needed
+        pass
 
     def _export_data(self):
         """Export data to JSON file"""
@@ -596,6 +713,7 @@ class MainWindow(QMainWindow):
 
             # Refresh UI
             self._load_todos()
+            self._load_archived_todos()
             self._update_heatmap()
 
             QMessageBox.information(

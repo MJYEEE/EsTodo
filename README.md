@@ -26,6 +26,11 @@
 - ✅ JSON 导入导出（备份/迁移数据）
 - ✅ PyInstaller 打包（Windows/Linux 单文件 exe）
 - ✅ GitHub Actions CI/CD（自动构建 Release）
+- ✅ 待办事项归档功能（根待办及其子待办一起归档）
+- ✅ 独立归档页面查看已归档事项
+- ✅ 只读查看模式（双击待办查看，右键编辑）
+- ✅ 待办列表右侧复选框快速切换完成状态
+- ✅ 刷新列表保持展开/选中状态
 
 ## 安装
 
@@ -60,6 +65,21 @@ python -m estodo.main
 python src/estodo/main.py
 ```
 
+## 使用说明
+
+### 待办事项交互
+
+- **单击待办**：只选中，不显示详情
+- **双击待办**：打开只读查看界面
+- **右键菜单 → 编辑**：打开编辑界面
+- **右侧复选框**：快速切换完成状态（活跃待办列表）
+
+### 归档功能
+
+- **归档待办**：右键根待办 → 选择"📦 归档"（根待办及其所有子待办会一起归档）
+- **查看归档**：左侧导航点击"📦 归档事项"
+- **取消归档**：在归档页面右键待办 → 选择"📦 取消归档"
+
 ## 开发计划
 
 ### v0.1
@@ -85,9 +105,18 @@ python src/estodo/main.py
 ### v0.5
 - JSON 导入导出（备份/迁移数据）
 
-### v0.6 (当前)
+### v0.6
 - PyInstaller 打包（Windows/Linux 单文件 exe）
 - GitHub Actions CI/CD（自动构建 Release）
+
+### v0.7 (当前)
+- 待办事项归档功能（根待办及其子待办一起归档）
+- 独立归档页面
+- 只读查看模式（TodoViewer）
+- 交互优化：单击只选中，双击查看，右键编辑
+- 待办列表右侧复选框快速切换完成状态
+- 刷新列表保持展开/选中状态
+- 数据库迁移支持（status 字段）
 
 ## 快捷键
 
@@ -142,8 +171,8 @@ python src/estodo/main.py
 
 ```bash
 # 打版本标签
-git tag -a v0.6.0 -m "Release v0.6.0"
-git push origin v0.6.0
+git tag -a v0.7.0 -m "Release v0.7.0"
+git push origin v0.7.0
 ```
 
 GitHub Actions 会自动：
@@ -185,6 +214,7 @@ EsTodo/
 │           ├── main_window.py
 │           ├── todo_tree.py
 │           ├── todo_editor.py
+│           ├── todo_viewer.py    # 新增：只读查看器
 │           ├── pomodoro_timer.py
 │           ├── heatmap.py
 │           ├── day_detail_dialog.py

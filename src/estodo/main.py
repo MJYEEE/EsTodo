@@ -19,7 +19,7 @@ if str(src_path) not in sys.path:
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon    
 
 from estodo.database import Database
 from estodo.views.main_window import MainWindow
@@ -40,6 +40,15 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("EsTodo")
     app.setOrganizationName("EsTodo")
+
+    # 设置窗口图标
+    # 获取程序运行的根目录
+    base_path = Path(__file__).parent.parent.parent
+    icon_path = base_path / "assets" / "icon.ico"
+
+    # 设置左上角图标 + 任务栏图标
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     # Qt6 supports this rounding policy API
     app.setHighDpiScaleFactorRoundingPolicy(

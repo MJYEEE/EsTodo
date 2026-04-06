@@ -6,6 +6,11 @@ from typing import Optional, List
 from ..database import Database
 
 
+# Status constants
+TODO_STATUS_ACTIVE = 0
+TODO_STATUS_ARCHIVED = 1
+
+
 @dataclass
 class Todo:
     """Todo data class"""
@@ -16,6 +21,7 @@ class Todo:
     priority: int = 1  # 1=low, 2=medium, 3=high
     is_completed: bool = False
     sort_order: int = 0
+    status: int = TODO_STATUS_ACTIVE  # 0=active, 1=archived
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -52,9 +58,9 @@ class TodoModel:
         """Create a new todo"""
         with self.db._get_connection() as conn:
             cursor = conn.execute("""
-                INSERT INTO todos (parent_id, title, content, priority, sort_order)
-                VALUES (?, ?, ?, ?, ?)
-            """, (todo.parent_id, todo.title, todo.content, todo.priority, todo.sort_order))
+                INSERT INTO todos (parent_id, title, content, priority, sort_order, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (todo.parent_id, todo.title, todo.content, todo.priority, todo.sort_order, todo.status))
             todo.id = cursor.lastrowid
 
             # Get the created todo with timestamps
@@ -69,11 +75,12 @@ class TodoModel:
             conn.execute("""
                 UPDATE todos
                 SET parent_id = ?, title = ?, content = ?, priority = ?,
-                    is_completed = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP,
-                    completed_at = ?
+                    is_completed = ?, sort_order = ?, status = ?,
+                    updated_at = CURRENT_TIMESTAMP, completed_at = ?
                 WHERE id = ?
             """, (todo.parent_id, todo.title, todo.content, todo.priority,
-                  int(todo.is_completed), todo.sort_order, completed_at, todo.id))
+                  int(todo.is_completed), todo.sort_order, todo.status,
+                  completed_at, todo.id))
 
             cursor = conn.execute("SELECT * FROM todos WHERE id = ?", (todo.id,))
             row = cursor.fetchone()
@@ -96,6 +103,40 @@ class TodoModel:
         # Delete the todo itself
         conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
 
+    def archive(self, todo_id: int):
+        """Archive a todo and all its children recursively"""
+        with self.db._get_connection() as conn:
+            self._archive_with_children(conn, todo_id)
+
+    def _archive_with_children(self, conn, todo_id: int):
+        """Recursively archive a todo and its children"""
+        # Get all children first
+        cursor = conn.execute("SELECT id FROM todos WHERE parent_id = ?", (todo_id,))
+        children = cursor.fetchall()
+        for child in children:
+            self._archive_with_children(conn, child["id"])
+
+        # Archive the todo itself
+        conn.execute("UPDATE todos SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                     (TODO_STATUS_ARCHIVED, todo_id))
+
+    def unarchive(self, todo_id: int):
+        """Unarchive a todo and all its children recursively"""
+        with self.db._get_connection() as conn:
+            self._unarchive_with_children(conn, todo_id)
+
+    def _unarchive_with_children(self, conn, todo_id: int):
+        """Recursively unarchive a todo and its children"""
+        # Get all children first
+        cursor = conn.execute("SELECT id FROM todos WHERE parent_id = ?", (todo_id,))
+        children = cursor.fetchall()
+        for child in children:
+            self._unarchive_with_children(conn, child["id"])
+
+        # Unarchive the todo itself
+        conn.execute("UPDATE todos SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                     (TODO_STATUS_ACTIVE, todo_id))
+
     def get_by_id(self, todo_id: int) -> Optional[Todo]:
         """Get a todo by id"""
         with self.db._get_connection() as conn:
@@ -105,11 +146,11 @@ class TodoModel:
                 return self._row_to_todo(row)
             return None
 
-    def get_root_todos(self, include_completed: bool = True) -> List[Todo]:
-        """Get all root level todos"""
+    def get_root_todos(self, include_completed: bool = True, status: int = TODO_STATUS_ACTIVE) -> List[Todo]:
+        """Get all root level todos with optional status filter"""
         with self.db._get_connection() as conn:
-            query = "SELECT * FROM todos WHERE parent_id IS NULL"
-            params = []
+            query = "SELECT * FROM todos WHERE parent_id IS NULL AND status = ?"
+            params = [status]
             if not include_completed:
                 query += " AND is_completed = 0"
             query += " ORDER BY sort_order, created_at DESC"
@@ -119,15 +160,15 @@ class TodoModel:
 
             # Load children for each todo
             for todo in todos:
-                todo.children = self.get_children(todo.id, include_completed)
+                todo.children = self.get_children(todo.id, include_completed, status)
 
             return todos
 
-    def get_children(self, parent_id: int, include_completed: bool = True) -> List[Todo]:
+    def get_children(self, parent_id: int, include_completed: bool = True, status: int = TODO_STATUS_ACTIVE) -> List[Todo]:
         """Get children of a todo"""
         with self.db._get_connection() as conn:
-            query = "SELECT * FROM todos WHERE parent_id = ?"
-            params = [parent_id]
+            query = "SELECT * FROM todos WHERE parent_id = ? AND status = ?"
+            params = [parent_id, status]
             if not include_completed:
                 query += " AND is_completed = 0"
             query += " ORDER BY sort_order, created_at DESC"
@@ -137,17 +178,23 @@ class TodoModel:
 
             # Recursively load children
             for child in children:
-                child.children = self.get_children(child.id, include_completed)
+                child.children = self.get_children(child.id, include_completed, status)
 
             return children
 
-    def get_all_todos_flat(self, include_completed: bool = True) -> List[Todo]:
+    def get_all_todos_flat(self, include_completed: bool = True, status: Optional[int] = None) -> List[Todo]:
         """Get all todos as a flat list"""
         with self.db._get_connection() as conn:
             query = "SELECT * FROM todos"
             params = []
+            conditions = []
             if not include_completed:
-                query += " WHERE is_completed = 0"
+                conditions.append("is_completed = 0")
+            if status is not None:
+                conditions.append("status = ?")
+                params.append(status)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
             query += " ORDER BY created_at DESC"
 
             cursor = conn.execute(query, params)
@@ -163,6 +210,8 @@ class TodoModel:
             priority=row["priority"],
             is_completed=bool(row["is_completed"]),
             sort_order=row["sort_order"],
+            # status=row.get("status", TODO_STATUS_ACTIVE),
+            status=row["status"] if "status" in row.keys() else TODO_STATUS_ACTIVE,
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
             completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,

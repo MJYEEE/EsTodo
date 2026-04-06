@@ -21,6 +21,7 @@ icon_path = "assets/icon.ico" if os.path.exists("assets/icon.ico") else None
 # Collect datas - need to add the estodo package
 datas = [
     (str(src_path / "estodo"), "estodo"),
+    ("assets", "assets"),
 ]
 
 a = Analysis(

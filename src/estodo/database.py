@@ -47,9 +47,25 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     completed_at TIMESTAMP,
+                    status INTEGER DEFAULT 0,
                     FOREIGN KEY (parent_id) REFERENCES todos(id)
                 )
             """)
+
+            # Database migration: add status column if not exists
+            self._migrate_database(conn)
+
+    def _migrate_database(self, conn: sqlite3.Connection):
+        """Migrate database to latest version"""
+        # Check if status column exists
+        cursor = conn.execute("PRAGMA table_info(todos)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if "status" not in columns:
+            # Add status column with default 0 (active)
+            conn.execute("ALTER TABLE todos ADD COLUMN status INTEGER DEFAULT 0")
+            # Create index for status
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)")
 
             # Pomodoros table
             conn.execute("""
@@ -100,6 +116,9 @@ class Database:
             """)
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_todos_completed ON todos(is_completed)
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)
             """)
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_pomodoros_start ON pomodoros(start_time)

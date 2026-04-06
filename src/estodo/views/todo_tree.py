@@ -2,12 +2,12 @@
 
 from PyQt6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QMenu
+    QPushButton, QLabel, QMenu, QHeaderView
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QSize
 from PyQt6.QtGui import QDrag, QIcon, QColor, QFont
 from typing import Optional, List, Any, Set
-from ..models.todo import Todo
+from ..models.todo import Todo, TODO_STATUS_ACTIVE, TODO_STATUS_ARCHIVED
 
 
 class TodoTreeItem(QTreeWidgetItem):
@@ -52,16 +52,22 @@ class TodoTreeWidget(QWidget):
     """Todo tree widget with smooth scrolling - Windows 11 style"""
 
     todo_selected = pyqtSignal(object)  # Emits Todo or None
-    todo_double_clicked = pyqtSignal(object)  # Emits Todo
+    todo_double_clicked = pyqtSignal(object)  # Emits Todo (for viewing)
+    todo_edit_requested = pyqtSignal(object)  # Emits Todo (for editing)
     start_pomodoro_for_todo = pyqtSignal(object)  # Emits Todo
     new_todo_requested = pyqtSignal()  # Request new todo
     new_child_todo_requested = pyqtSignal(object)  # Request new child todo for parent
     todo_toggle_completed = pyqtSignal(object)  # Toggle todo completion
     todo_delete_requested = pyqtSignal(object)  # Request todo deletion
+    todo_archive_requested = pyqtSignal(object)  # Request todo archive
+    todo_unarchive_requested = pyqtSignal(object)  # Request todo unarchive
+    todo_checkbox_clicked = pyqtSignal(object)  # Emits Todo when checkbox clicked
 
-    def __init__(self, parent=None):
+    def __init__(self, mode: str = "active", parent=None):
         super().__init__(parent)
         self.todos: List[Todo] = []
+        self.mode = mode  # "active" or "archive"
+        self.show_checkbox = (mode == "active")
         self._expanded_ids: Set[int] = set()  # Store expanded todo IDs
         self._selected_todo_id: Optional[int] = None  # Store selected todo ID
         self._setup_ui()
@@ -76,7 +82,7 @@ class TodoTreeWidget(QWidget):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(8)
 
-        title_label = QLabel("待办事项")
+        title_label = QLabel("待办事项" if self.mode == "active" else "归档事项")
         title_label.setObjectName("headerLabel")
         title_label.setStyleSheet("""
             font-size: 24px;
@@ -87,20 +93,31 @@ class TodoTreeWidget(QWidget):
 
         header_layout.addStretch()
 
-        self.add_button = QPushButton("+ 新建")
-        self.add_button.setObjectName("primaryButton")
-        self.add_button.setMinimumHeight(36)
-        header_layout.addWidget(self.add_button)
+        if self.mode == "active":
+            self.add_button = QPushButton("+ 新建")
+            self.add_button.setObjectName("primaryButton")
+            self.add_button.setMinimumHeight(36)
+            header_layout.addWidget(self.add_button)
 
-        self.add_child_button = QPushButton("+ 子待办")
-        self.add_child_button.setObjectName("secondaryButton")
-        self.add_child_button.setMinimumHeight(36)
-        header_layout.addWidget(self.add_child_button)
+            self.add_child_button = QPushButton("+ 子待办")
+            self.add_child_button.setObjectName("secondaryButton")
+            self.add_child_button.setMinimumHeight(36)
+            header_layout.addWidget(self.add_child_button)
 
-        self.delete_button = QPushButton("删除")
-        self.delete_button.setObjectName("secondaryButton")
-        self.delete_button.setMinimumHeight(36)
-        header_layout.addWidget(self.delete_button)
+            self.delete_button = QPushButton("删除")
+            self.delete_button.setObjectName("secondaryButton")
+            self.delete_button.setMinimumHeight(36)
+            header_layout.addWidget(self.delete_button)
+        else:
+            self.unarchive_button = QPushButton("📦 取消归档")
+            self.unarchive_button.setObjectName("secondaryButton")
+            self.unarchive_button.setMinimumHeight(36)
+            header_layout.addWidget(self.unarchive_button)
+
+            self.delete_button = QPushButton("删除")
+            self.delete_button.setObjectName("secondaryButton")
+            self.delete_button.setMinimumHeight(36)
+            header_layout.addWidget(self.delete_button)
 
         layout.addLayout(header_layout)
 
@@ -118,6 +135,16 @@ class TodoTreeWidget(QWidget):
         self.tree.setWordWrap(False)
         self.tree.setRootIsDecorated(True)  # Enable native branch indicators
 
+        # Setup columns
+        if self.show_checkbox:
+            self.tree.setColumnCount(2)
+            self.tree.header().setStretchLastSection(False)
+            self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            self.tree.header().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        else:
+            self.tree.setColumnCount(1)
+            self.tree.header().setStretchLastSection(True)
+
         # Smooth scrolling optimization
         self.tree.setVerticalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
         self.tree.setHorizontalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
@@ -128,8 +155,18 @@ class TodoTreeWidget(QWidget):
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
         self.tree.itemExpanded.connect(self._on_item_expanded)
         self.tree.itemCollapsed.connect(self._on_item_collapsed)
+        self.tree.itemChanged.connect(self._on_item_changed)
 
         layout.addWidget(self.tree, 1)
+
+        # Connect mode-specific buttons
+        if self.mode == "active":
+            self.add_button.clicked.connect(self.new_todo_requested.emit)
+            self.add_child_button.clicked.connect(self._on_add_child_clicked)
+            self.delete_button.clicked.connect(self._on_delete_clicked)
+        else:
+            self.unarchive_button.clicked.connect(self._on_unarchive_clicked)
+            self.delete_button.clicked.connect(self._on_delete_clicked)
 
     def set_todos(self, todos: List[Todo]):
         """Set the todos to display"""
@@ -221,9 +258,25 @@ class TodoTreeWidget(QWidget):
         if isinstance(item, TodoTreeItem) and item.todo.id:
             self._expanded_ids.discard(item.todo.id)
 
+    def _on_item_changed(self, item, column):
+        """Handle item changed (checkbox click)"""
+        if isinstance(item, TodoTreeItem) and column == 1 and self.show_checkbox:
+            # Update todo completion state from checkbox
+            is_checked = item.checkState(1) == Qt.CheckState.Checked
+            if item.todo.is_completed != is_checked:
+                item.todo.is_completed = is_checked
+                item.update_display()
+                self.todo_checkbox_clicked.emit(item.todo)
+
     def _create_tree_item(self, todo: Todo) -> TodoTreeItem:
         """Create a tree item for a todo"""
-        return TodoTreeItem(todo)
+        item = TodoTreeItem(todo)
+
+        # Add checkbox for active mode
+        if self.show_checkbox:
+            item.setCheckState(1, Qt.CheckState.Checked if todo.is_completed else Qt.CheckState.Unchecked)
+
+        return item
 
     def _add_children(self, parent_item: QTreeWidgetItem, children: List[Todo]):
         """Add child todos to a tree item"""
@@ -241,6 +294,24 @@ class TodoTreeWidget(QWidget):
         """Handle double click"""
         if isinstance(item, TodoTreeItem):
             self.todo_double_clicked.emit(item.todo)
+
+    def _on_add_child_clicked(self):
+        """Handle add child button clicked"""
+        todo = self.get_selected_todo()
+        if todo:
+            self.new_child_todo_requested.emit(todo)
+
+    def _on_delete_clicked(self):
+        """Handle delete button clicked"""
+        todo = self.get_selected_todo()
+        if todo:
+            self.todo_delete_requested.emit(todo)
+
+    def _on_unarchive_clicked(self):
+        """Handle unarchive button clicked"""
+        todo = self.get_selected_todo()
+        if todo:
+            self.todo_unarchive_requested.emit(todo)
 
     def _show_context_menu(self, position):
         """Show context menu - Windows 11 style"""
@@ -268,27 +339,48 @@ class TodoTreeWidget(QWidget):
             }
         """)
 
-        add_action = menu.addAction("新建待办")
-        add_child_action = menu.addAction("新建子待办")
-        menu.addSeparator()
-        pomodoro_action = menu.addAction("🍅 开始番茄钟")
-        menu.addSeparator()
-        edit_action = menu.addAction("编辑")
-        toggle_action = menu.addAction("标记完成" if not item.todo.is_completed else "标记未完成")
-        menu.addSeparator()
-        delete_action = menu.addAction("删除")
+        if self.mode == "active":
+            add_action = menu.addAction("新建待办")
+            # Only show "新建子待办" if item is a root item (parent_id is None)
+            if item.todo.parent_id is None:
+                add_child_action = menu.addAction("新建子待办")
+            menu.addSeparator()
+            pomodoro_action = menu.addAction("🍅 开始番茄钟")
+            menu.addSeparator()
+            edit_action = menu.addAction("编辑")
+            toggle_action = menu.addAction("标记完成" if not item.todo.is_completed else "标记未完成")
+            menu.addSeparator()
+            archive_action = menu.addAction("📦 归档")
+            menu.addSeparator()
+            delete_action = menu.addAction("删除")
+        else:
+            unarchive_action = menu.addAction("📦 取消归档")
+            menu.addSeparator()
+            view_action = menu.addAction("查看详情")
+            menu.addSeparator()
+            delete_action = menu.addAction("删除")
 
         action = menu.exec(self.tree.viewport().mapToGlobal(position))
 
-        if action == add_action:
-            self.new_todo_requested.emit()
-        elif action == add_child_action:
-            self.new_child_todo_requested.emit(item.todo)
-        elif action == pomodoro_action:
-            self.start_pomodoro_for_todo.emit(item.todo)
-        elif action == edit_action:
-            self.todo_double_clicked.emit(item.todo)
-        elif action == toggle_action:
-            self.todo_toggle_completed.emit(item.todo)
-        elif action == delete_action:
-            self.todo_delete_requested.emit(item.todo)
+        if self.mode == "active":
+            if action == add_action:
+                self.new_todo_requested.emit()
+            elif item.todo.parent_id is None and action == add_child_action:
+                self.new_child_todo_requested.emit(item.todo)
+            elif action == pomodoro_action:
+                self.start_pomodoro_for_todo.emit(item.todo)
+            elif action == edit_action:
+                self.todo_edit_requested.emit(item.todo)
+            elif action == toggle_action:
+                self.todo_toggle_completed.emit(item.todo)
+            elif action == archive_action:
+                self.todo_archive_requested.emit(item.todo)
+            elif action == delete_action:
+                self.todo_delete_requested.emit(item.todo)
+        else:
+            if action == unarchive_action:
+                self.todo_unarchive_requested.emit(item.todo)
+            elif action == view_action:
+                self.todo_double_clicked.emit(item.todo)
+            elif action == delete_action:
+                self.todo_delete_requested.emit(item.todo)
