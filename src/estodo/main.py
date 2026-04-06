@@ -19,10 +19,21 @@ if str(src_path) not in sys.path:
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QIcon    
+from PyQt6.QtGui import QFont, QIcon
 
 from estodo.database import Database
 from estodo.views.main_window import MainWindow
+
+
+def get_resource_path(relative_path: str) -> Path:
+    """Get resource path - works for both dev and PyInstaller"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running in PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Running in development
+        base_path = Path(__file__).parent.parent.parent
+    return base_path / relative_path
 
 
 def main():
@@ -42,9 +53,7 @@ def main():
     app.setOrganizationName("EsTodo")
 
     # 设置窗口图标
-    # 获取程序运行的根目录
-    base_path = Path(__file__).parent.parent.parent
-    icon_path = base_path / "assets" / "icon.ico"
+    icon_path = get_resource_path("assets/icon.ico")
 
     # 设置左上角图标 + 任务栏图标
     if icon_path.exists():

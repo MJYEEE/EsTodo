@@ -15,8 +15,8 @@ block_cipher = None
 # Paths
 src_path = Path("src")
 
-# Determine icon path
-icon_path = "assets/icon.ico" if os.path.exists("assets/icon.ico") else None
+# Determine icon path - use absolute path
+icon_path = str(Path("assets/icon.ico").absolute()) if Path("assets/icon.ico").exists() else None
 
 # Collect datas - need to add the estodo package
 datas = [

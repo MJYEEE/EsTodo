@@ -52,21 +52,6 @@ class Database:
                 )
             """)
 
-            # Database migration: add status column if not exists
-            self._migrate_database(conn)
-
-    def _migrate_database(self, conn: sqlite3.Connection):
-        """Migrate database to latest version"""
-        # Check if status column exists
-        cursor = conn.execute("PRAGMA table_info(todos)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if "status" not in columns:
-            # Add status column with default 0 (active)
-            conn.execute("ALTER TABLE todos ADD COLUMN status INTEGER DEFAULT 0")
-            # Create index for status
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)")
-
             # Pomodoros table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS pomodoros (
@@ -127,8 +112,22 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_pomodoros_todo ON pomodoros(todo_id)
             """)
 
-            # Initialize default settings
+            # Database migration: add status column if not exists
+            self._migrate_database(conn)
+
+            # Initialize default settings (including any new ones)
             self._init_default_settings(conn)
+
+    def _migrate_database(self, conn: sqlite3.Connection):
+        """Migrate database to latest version"""
+        # Check if status column exists in todos table
+        cursor = conn.execute("PRAGMA table_info(todos)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if "status" not in columns:
+            # Add status column with default 0 (active)
+            conn.execute("ALTER TABLE todos ADD COLUMN status INTEGER DEFAULT 0")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)")
 
     def _init_default_settings(self, conn: sqlite3.Connection):
         """Initialize default settings"""
@@ -140,6 +139,8 @@ class Database:
             "theme": "light",
             "shortcut_new_todo": "Ctrl+N",
             "shortcut_complete": "Ctrl+Enter",
+            "close_action": "ask",
+            "minimize_to_tray": "true",
         }
 
         for key, value in defaults.items():

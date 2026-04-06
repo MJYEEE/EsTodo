@@ -1,14 +1,27 @@
 """Main window for EsTodo"""
 
+import sys
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QSplitter, QFrame,
-    QMessageBox, QFileDialog
+    QMessageBox, QFileDialog, QCheckBox, QSystemTrayIcon, QMenu
 )
 from PyQt6.QtCore import Qt, QSize, QDate
 from PyQt6.QtGui import QAction, QIcon
 from typing import Optional
 from datetime import datetime, timedelta
+
+
+def get_resource_path(relative_path: str) -> Path:
+    """Get resource path - works for both dev and PyInstaller"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running in PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Running in development
+        base_path = Path(__file__).parent.parent.parent
+    return base_path / relative_path
 
 from .theme import Theme, get_stylesheet
 from .todo_tree import TodoTreeWidget
@@ -19,6 +32,7 @@ from .heatmap import HeatmapCalendar
 from .day_detail_dialog import DayDetailDialog
 from .tag_dialog import TagManagerDialog
 from .notifications import notify
+from .settings_page import SettingsPage
 from ..database import Database
 from ..models.todo import TodoModel, Todo, TODO_STATUS_ACTIVE, TODO_STATUS_ARCHIVED
 from ..models.pomodoro import PomodoroModel, Pomodoro
@@ -39,10 +53,14 @@ class MainWindow(QMainWindow):
         self.current_todo: Optional[Todo] = None
         self.current_theme = Theme.LIGHT
         self.pomodoro_widget: Optional[PomodoroTimerWidget] = None
+        self._tray_icon: Optional[QSystemTrayIcon] = None
+        self._is_exiting: bool = False
 
         self._setup_ui()
+        self._setup_tray()
         self._load_todos()
         self._load_archived_todos()
+        self._load_theme_from_settings()
         self._apply_theme()
 
     def _setup_ui(self):
@@ -211,14 +229,10 @@ class MainWindow(QMainWindow):
         stats_layout.addWidget(stats_label)
         self.page_stack.addWidget(stats_page)
 
-        # Page 5: Settings (placeholder)
-        settings_page = QWidget()
-        settings_layout = QVBoxLayout(settings_page)
-        settings_label = QLabel("设置 - 即将推出")
-        settings_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        settings_label.setStyleSheet("font-size: 18px; color: #64748b;")
-        settings_layout.addWidget(settings_label)
-        self.page_stack.addWidget(settings_page)
+        # Page 5: Settings
+        self.settings_page = SettingsPage(self.db)
+        self.settings_page.theme_changed.connect(self._on_settings_theme_changed)
+        self.page_stack.addWidget(self.settings_page)
 
         content_layout.addWidget(self.page_stack)
         main_layout.addWidget(content, 1)
@@ -407,6 +421,9 @@ class MainWindow(QMainWindow):
             if self.pomodoro_widget:
                 self.pomodoro_widget.set_dark_mode(False)
         self._apply_theme()
+        # Save to database
+        theme_value = "dark" if self.current_theme == Theme.DARK else "light"
+        self.db.set_setting("theme", theme_value)
 
     def _apply_theme(self):
         """Apply the current theme"""
@@ -730,3 +747,173 @@ class MainWindow(QMainWindow):
                 "导入失败",
                 f"导入时出错：\n{str(e)}"
             )
+
+    def _setup_tray(self):
+        """Setup system tray icon"""
+        from PyQt6.QtWidgets import QApplication
+
+        # Use the application's window icon (already set in main.py)
+        app = QApplication.instance()
+        icon = app.windowIcon()
+
+        # Fallback if no icon is set
+        if icon.isNull():
+            # Try to load from assets using resource path helper
+            icon_path = get_resource_path("assets/icon.ico")
+            if icon_path.exists():
+                icon = QIcon(str(icon_path))
+            else:
+                # Last fallback: use a standard icon
+                icon = self.style().standardIcon(
+                    self.style().StandardPixmap.SP_ComputerIcon
+                )
+
+        # Create tray icon
+        self._tray_icon = QSystemTrayIcon(icon, self)
+        self._tray_icon.setToolTip("EsTodo")
+
+        # Create tray menu
+        tray_menu = QMenu()
+
+        # Show/Hide action
+        self._toggle_action = QAction("显示/隐藏", self)
+        self._toggle_action.triggered.connect(self._toggle_window_visibility)
+        tray_menu.addAction(self._toggle_action)
+
+        tray_menu.addSeparator()
+
+        # New todo action
+        new_todo_action = QAction("新建待办", self)
+        new_todo_action.triggered.connect(self._on_new_todo)
+        tray_menu.addAction(new_todo_action)
+
+        # Start pomodoro action
+        pomodoro_action = QAction("启动番茄钟", self)
+        pomodoro_action.triggered.connect(lambda: self._switch_page(2))
+        tray_menu.addAction(pomodoro_action)
+
+        tray_menu.addSeparator()
+
+        # Quit action
+        quit_action = QAction("退出", self)
+        quit_action.triggered.connect(self._force_quit)
+        tray_menu.addAction(quit_action)
+
+        self._tray_icon.setContextMenu(tray_menu)
+
+        # Connect tray icon activated signal
+        self._tray_icon.activated.connect(self._on_tray_icon_activated)
+
+        # Show the tray icon
+        self._tray_icon.show()
+
+    def _on_tray_icon_activated(self, reason: QSystemTrayIcon.ActivationReason):
+        """Handle tray icon activation"""
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self._toggle_window_visibility()
+
+    def _toggle_window_visibility(self):
+        """Toggle window visibility"""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.activateWindow()
+            self.raise_()
+
+    def _load_theme_from_settings(self):
+        """Load theme from settings"""
+        theme = self.db.get_setting("theme", "light")
+        if theme == "dark":
+            self.current_theme = Theme.DARK
+            self.theme_button.setText("☀️  浅色模式")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(True)
+        else:
+            self.current_theme = Theme.LIGHT
+            self.theme_button.setText("🌙  深色模式")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(False)
+
+    def _on_settings_theme_changed(self, theme: str):
+        """Handle theme change from settings page"""
+        if theme == "dark":
+            self.current_theme = Theme.DARK
+            self.theme_button.setText("☀️  浅色模式")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(True)
+        else:
+            self.current_theme = Theme.LIGHT
+            self.theme_button.setText("🌙  深色模式")
+            if self.pomodoro_widget:
+                self.pomodoro_widget.set_dark_mode(False)
+        self._apply_theme()
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        if self._is_exiting:
+            event.accept()
+            return
+
+        close_action = self.db.get_setting("close_action", "ask")
+
+        if close_action == "minimize":
+            # Minimize to tray
+            self.hide()
+            event.ignore()
+        elif close_action == "quit":
+            # Quit directly
+            event.accept()
+        else:
+            # Ask user
+            event.ignore()
+            self._show_close_dialog()
+
+    def changeEvent(self, event):
+        """Handle window state change (minimize)"""
+        if event.type() == event.Type.WindowStateChange:
+            minimize_to_tray = self.db.get_setting("minimize_to_tray", "true")
+            if minimize_to_tray == "true" and self.isMinimized():
+                self.hide()
+                event.ignore()
+                return
+        super().changeEvent(event)
+
+    def _show_close_dialog(self):
+        """Show close action dialog"""
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setWindowTitle("关闭 EsTodo")
+        dialog.setText("你想要如何关闭 EsTodo？")
+
+        # Add custom buttons
+        minimize_btn = dialog.addButton("最小化到托盘", QMessageBox.ButtonRole.ActionRole)
+        quit_btn = dialog.addButton("退出应用", QMessageBox.ButtonRole.ActionRole)
+        cancel_btn = dialog.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+
+        # Add checkbox
+        checkbox = QCheckBox("记住我的选择")
+        dialog.setCheckBox(checkbox)
+
+        dialog.exec()
+
+        clicked_button = dialog.clickedButton()
+
+        if clicked_button == minimize_btn:
+            if checkbox.isChecked():
+                self.db.set_setting("close_action", "minimize")
+            self.hide()
+        elif clicked_button == quit_btn:
+            if checkbox.isChecked():
+                self.db.set_setting("close_action", "quit")
+            self._force_quit()
+        # Cancel does nothing
+
+    def _force_quit(self):
+        """Force quit the application"""
+        self._is_exiting = True
+        if self._tray_icon:
+            self._tray_icon.hide()
+        self.close()
+        from PyQt6.QtWidgets import QApplication
+        QApplication.quit()
